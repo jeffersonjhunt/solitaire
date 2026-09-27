@@ -1,97 +1,86 @@
 import SwiftUI
 import SolitaireEngine
 
-/// U2 placeholder board: every pile as a row of plain card labels, wired to the store's intents,
-/// so the app shell is playable end to end. U3 replaces it with the real board.
+/// The whole window: the green table, the board, the toolbar (bottom on iPhone, top elsewhere),
+/// and on a win the cascade plus the win sheet with the move count and time.
 struct ContentView: View {
     let store: GameStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dismissedWinSeed: UInt64?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            statusBar
-            HStack(spacing: 16) {
-                Button { store.tapStock() } label: {
-                    Text(store.state.stock.isEmpty ? "↺" : "Stock \(store.state.stock.count)")
+        VStack(spacing: 0) {
+            if !Self.barAtBottom { GameBar(store: store) }
+            BoardView(store: store)
+                .padding(.horizontal, 4)
+                .overlay {
+                    if store.state.isWon && !reduceMotion {
+                        GeometryReader { geo in
+                            WinCascade(foundations: store.state.foundations,
+                                       layout: BoardLayout(state: store.state,
+                                                           metrics: BoardMetrics(size: geo.size, isTouch: BoardView.isTouch)))
+                        }
+                        .id(store.state.seed)          // a fresh cascade for every win
+                    }
                 }
-                .accessibilityLabel(store.state.stock.isEmpty ? "Redeal" : "Stock")
-                pile(.waste, store.state.waste.suffix(3), offset: max(store.state.waste.count - 3, 0))
-                Spacer()
-                ForEach(0..<4, id: \.self) { f in
-                    pile(.foundation(f), store.state.foundations[f].suffix(1),
-                         offset: max(store.state.foundations[f].count - 1, 0))
-                }
-            }
-            Divider()
-            ForEach(0..<7, id: \.self) { t in
-                pile(.tableau(t), store.state.tableau[t][...], offset: 0)
-            }
-            Spacer()
+            if Self.barAtBottom { GameBar(store: store) }
         }
-        .padding()
-        .font(.system(.body, design: .monospaced))
-        .sheet(isPresented: .constant(store.state.isWon)) {
-            VStack(spacing: 12) {
-                Text("You won").font(.title.bold())
-                Text("\(store.state.moveCount) moves · \(Self.clock(store.state.elapsed))")
-                Button("New Game") { store.newGame(drawCount: store.state.drawCount) }
-            }
-            .padding(40)
-        }
-    }
-
-    private var statusBar: some View {
-        HStack {
-            Text("Moves \(store.state.moveCount)")
-            Text(Self.clock(store.state.elapsed))
-            Spacer()
-            if store.canAutoFinish {
-                Button("Auto-finish") { store.autoFinish() }
-            }
-            Button("Undo") { store.undo() }.disabled(!store.canUndo)
-            Menu("New") {
-                Button("Draw 1") { store.newGame(drawCount: 1) }
-                Button("Draw 3") { store.newGame(drawCount: 3) }
+        .background(TableBackground().ignoresSafeArea())
+        .sheet(isPresented: winSheetShown) {
+            WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed) {
+                store.newGame(drawCount: store.state.drawCount)
             }
         }
     }
 
-    /// A pile as tappable labels; `offset` is the index of the first shown card in the pile.
-    private func pile(_ id: PileID, _ cards: ArraySlice<Card>, offset: Int) -> some View {
-        HStack(spacing: 4) {
-            if cards.isEmpty {
-                Text("[  ]").foregroundStyle(.secondary).accessibilityLabel(Self.name(id))
+    /// Shown once per won game; closing it leaves the finished board (New Game is in the toolbar).
+    private var winSheetShown: Binding<Bool> {
+        Binding(
+            get: { store.state.isWon && dismissedWinSeed != store.state.seed },
+            set: { shown in if !shown { dismissedWinSeed = store.state.seed } }
+        )
+    }
+
+    static var barAtBottom: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+}
+
+/// A dark green gradient; card faces stay readable on it in light and dark mode.
+struct TableBackground: View {
+    var body: some View {
+        LinearGradient(colors: [Color("TableTop"), Color("TableBottom")], startPoint: .top, endPoint: .bottom)
+    }
+}
+
+struct WinSheet: View {
+    let moves: Int
+    let elapsed: TimeInterval
+    let newGame: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("You won!").font(.largeTitle.bold())
+            HStack(spacing: 24) {
+                Label("\(moves) moves", systemImage: "arrow.left.arrow.right")
+                Label(GameBar.clock(elapsed), systemImage: "clock")
+                    .accessibilityLabel("Time \(GameBar.spokenClock(elapsed))")
             }
-            ForEach(Array(cards.enumerated()), id: \.element.id) { i, card in
-                Text(card.isFaceUp ? Self.label(card) : "▒▒")
-                    .foregroundStyle(card.isFaceUp && card.suit.isRed ? .red : .primary)
-                    .onTapGesture { store.tap(pile: id, index: offset + i) }
-                    .accessibilityLabel(card.isFaceUp ? Self.spoken(card) : "Face-down card")
+            .font(.title3.monospacedDigit())
+            HStack {
+                Button("Close") { dismiss() }
+                Button("New Game") { newGame() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
             }
         }
-    }
-
-    static func label(_ card: Card) -> String {
-        let rank = [1: "A", 11: "J", 12: "Q", 13: "K"][card.rank] ?? "\(card.rank)"
-        return rank + ["♠", "♥", "♦", "♣"][card.suit.rawValue]
-    }
-
-    static func spoken(_ card: Card) -> String {
-        let rank = [1: "Ace", 11: "Jack", 12: "Queen", 13: "King"][card.rank] ?? "\(card.rank)"
-        return "\(rank) of \(["Spades", "Hearts", "Diamonds", "Clubs"][card.suit.rawValue])"
-    }
-
-    static func name(_ id: PileID) -> String {
-        switch id {
-        case .stock: "Stock"
-        case .waste: "Waste"
-        case .foundation(let f): "Foundation \(f + 1)"
-        case .tableau(let t): "Column \(t + 1)"
-        }
-    }
-
-    static func clock(_ elapsed: TimeInterval) -> String {
-        let s = Int(elapsed)
-        return String(format: "%d:%02d", s / 60, s % 60)
+        .padding(32)
+        .presentationDetents([.medium])
     }
 }
 

@@ -39,6 +39,14 @@ final class GameStore {
         updateClock()
     }
 
+    /// Continues a game from a given state (a saved game, or a test position). Undo starts empty.
+    func resume(from saved: GameState) {
+        stopAutoFinish()
+        state = saved
+        undoStack.removeAll()
+        updateClock()
+    }
+
     /// Tap or click on a card: sends it (with its run) to the best legal destination.
     /// Returns false when nothing can move, so the view can wiggle instead.
     @discardableResult
