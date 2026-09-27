@@ -27,8 +27,9 @@ public enum SolitaireEngine {
 
     // MARK: Moves
 
+    /// Once the game is won nothing moves any more, so a won game cannot be un-won.
     public static func canMove(_ move: Move, in state: GameState) -> Bool {
-        guard let run = movableRun(from: move.source, index: move.index, in: state),
+        guard !state.isWon, let run = movableRun(from: move.source, index: move.index, in: state),
               let first = run.first,
               move.source != move.destination else { return false }
 
@@ -67,8 +68,9 @@ public enum SolitaireEngine {
 
     /// Tapping the stock: draw `drawCount` cards (fewer if the stock runs short) onto the waste,
     /// face up; with the stock empty, turn the waste back over into the stock. Either counts as
-    /// one move. With both empty it does nothing.
+    /// one move. With both empty, or once the game is won, it does nothing.
     public static func drawFromStock(_ state: inout GameState) {
+        guard !state.isWon else { return }
         if state.stock.isEmpty {
             guard !state.waste.isEmpty else { return }
             state.stock = state.waste.reversed().map { card in
@@ -94,7 +96,11 @@ public enum SolitaireEngine {
     /// In order: a foundation, if it is a single card; then a non-empty tableau column that accepts
     /// the run, scanning left to right starting after the source column; then an empty column —
     /// unless the run already sits alone at the bottom of a column, which would be a no-op.
+    ///
+    /// A tap on a foundation card does nothing: taps send cards toward the foundations, and a
+    /// missed tap must never pull one back down. Taking a card off a foundation is drag-only.
     public static func autoDestination(for source: PileID, index: Int, in state: GameState) -> PileID? {
+        if case .foundation = source { return nil }
         guard let run = movableRun(from: source, index: index, in: state) else { return nil }
 
         if run.count == 1 {
@@ -163,6 +169,8 @@ public enum SolitaireEngine {
         case .waste:
             guard index == state.waste.count - 1, index >= 0 else { return nil }
         case .foundation(let f):
+            // Redundant with the built-run check below (a foundation ascends in one suit, so any
+            // slice of two or more is never a built run) — kept so the rule reads as stated.
             guard (0..<4).contains(f), index == state.foundations[f].count - 1, index >= 0 else { return nil }
         case .tableau(let t):
             guard (0..<7).contains(t), state.tableau[t].indices.contains(index) else { return nil }

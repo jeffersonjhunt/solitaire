@@ -61,6 +61,10 @@ typealias E = SolitaireEngine
         #expect(!can(s, .tableau(0), 1, .foundation(0)))      // 2 onto empty
         #expect(!can(s, .waste, 0, .foundation(0)))           // not the waste top
         #expect(!can(s, .tableau(1), 0, .foundation(0)))      // a run of two cannot go up
+        // …even when its first card fits: 2♥ (with A♠ on it) onto A♥ would bury the A♠.
+        let fits = board(tableau: [[up("2H"), up("AS")]], foundations: [foundation(.hearts, upTo: 1)])
+        #expect(!can(fits, .tableau(0), 0, .foundation(0)))
+        #expect(can(fits, .tableau(0), 1, .foundation(1)))    // the A♠ alone may go
     }
 
     @Test func foundationNeedsSameSuitAndNextRank() {
@@ -82,6 +86,13 @@ typealias E = SolitaireEngine
         #expect(!can(s, .tableau(0), 0, .tableau(1)))         // a face-down card
         #expect(!can(s, .tableau(0), 1, .tableau(4)))         // only a king onto an empty column
         #expect(!can(s, .tableau(3), 0, .tableau(5)))         // onto a face-down card
+        // Rank and colour both fit, so only the face-down check can refuse these:
+        let hidden = board(tableau: [[up("9S")], [down("10H")]])
+        #expect(!can(hidden, .tableau(0), 0, .tableau(1)))
+        // 9♥-8♠-7♠ is not a built run (7♠ on 8♠), though 9♥ itself fits the 10♠:
+        let unbuilt = board(tableau: [[up("9H"), up("8S"), up("7S")], [up("10S")]])
+        #expect(!can(unbuilt, .tableau(0), 0, .tableau(1)))
+        #expect(E.autoDestination(for: .tableau(0), index: 0, in: unbuilt) == nil)
     }
 
     @Test func kingWithItsRunOntoAnEmptyColumn() {
@@ -97,12 +108,15 @@ typealias E = SolitaireEngine
     }
 
     @Test func foundationBackToTableau() {
-        let s = board(tableau: [[up("4C")], [up("4H")]],
+        let s = board(tableau: [[up("4C")], [up("4H")], [up("3C")]],
                       foundations: [foundation(.hearts, upTo: 3)])
         #expect(can(s, .foundation(0), 2, .tableau(0)))       // 3♥ onto 4♣
         #expect(!can(s, .foundation(0), 2, .tableau(1)))      // same colour
-        #expect(!can(s, .foundation(0), 1, .tableau(0)))      // not the top card
+        #expect(!can(s, .foundation(0), 1, .tableau(2)))      // 2♥ would fit 3♣, but is not the top
         #expect(!can(s, .foundation(0), 2, .foundation(1)))   // foundation to foundation
+        // An ace could sit on any empty foundation — but never by moving between foundations.
+        let ace = board(foundations: [foundation(.hearts, upTo: 1)])
+        #expect(!can(ace, .foundation(0), 0, .foundation(1)))
     }
 
     @Test func nothingElse() {
@@ -210,6 +224,18 @@ typealias E = SolitaireEngine
         // 9♣-8♥ at column 3 fits 10♦ (col 0) and 10♥ (col 6): scanning 4,5,6,0… picks 6.
         #expect(dest(s, .tableau(3), 0) == .tableau(6))
         #expect(dest(s, .tableau(5), 0) == .tableau(6))        // 9♠ → 10♥, never an empty column first
+        // Wrap-around: 9♣ at column 5; the only fitting column (10♦) is to its left.
+        let wrap = board(tableau: [[up("5S")], [up("10D")], [up("6S")], [up("7S")], [], [up("9C")], [up("8S")]])
+        #expect(dest(wrap, .tableau(5), 0) == .tableau(1))
+    }
+
+    /// Taps send cards toward the foundations; a tap never pulls one back down.
+    @Test func tappingAFoundationCardDoesNothing() {
+        let s = board(tableau: [[up("4C")], []], foundations: [foundation(.hearts, upTo: 3), foundation(.spades, upTo: 13)])
+        #expect(dest(s, .foundation(0), 2) == nil)             // 3♥ would fit the 4♣
+        #expect(dest(s, .foundation(1), 12) == nil)            // K♠ would fit the empty column
+        #expect(E.canMove(Move(source: .foundation(0), index: 2, destination: .tableau(0)), in: s),
+                "still possible by drag")
     }
 
     @Test func emptyColumnIsTheLastResortAndNeverANoOp() {
@@ -241,6 +267,7 @@ typealias E = SolitaireEngine
                     guard let d = E.autoDestination(for: src, index: i, in: s) else { continue }
                     checked += 1
                     #expect(d != src)
+                    if case .foundation = src { Issue.record("a tap moved a card off a foundation") }
                     #expect(E.canMove(Move(source: src, index: i, destination: d), in: s))
                     if case .tableau(let t) = d, s.tableau[t].isEmpty, case .tableau = src {
                         #expect(i > 0, "moved a whole column to an empty column")
@@ -279,6 +306,18 @@ typealias E = SolitaireEngine
         }
         #expect(ranks == [1, 1, 2, 2])
         #expect(s.tableau.allSatisfy { $0.isEmpty })
+    }
+
+    @Test func nothingMovesOnceTheGameIsWon() {
+        var s = board(foundations: [foundation(.spades, upTo: 13), foundation(.hearts, upTo: 13),
+                                    foundation(.diamonds, upTo: 13), foundation(.clubs, upTo: 13)])
+        s.isWon = true
+        // K♠ onto an empty column is otherwise legal — only the won state refuses it.
+        #expect(!E.canMove(Move(source: .foundation(0), index: 12, destination: .tableau(0)), in: s))
+        s.stock = [down("2C")]                                  // the stock tap is refused as well
+        let before = s
+        E.drawFromStock(&s)
+        #expect(s == before)
     }
 
     @Test func aKnownSolvableSeedPlaysToAWin() {
