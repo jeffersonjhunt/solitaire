@@ -7,6 +7,7 @@ struct GameBar: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     private var isCompact: Bool { sizeClass == .compact }
+    @State private var choosingNewGame = false
     #else
     private let isCompact = false
     #endif
@@ -24,12 +25,7 @@ struct GameBar: View {
                 }
                 Button("Undo", systemImage: "arrow.uturn.backward") { store.undo() }
                     .disabled(!store.canUndo)           // also off once the game is won
-                Menu {
-                    Button("Draw 1") { store.newGame(drawCount: 1) }
-                    Button("Draw 3") { store.newGame(drawCount: 3) }
-                } label: {
-                    Label("New Game", systemImage: "plus.rectangle.on.rectangle")
-                }
+                newGameControl
             }
             // Icons only where width is tight (iPhone); the labels still name them for VoiceOver.
             .labelStyle(AdaptiveLabelStyle(iconOnly: isCompact))
@@ -41,6 +37,33 @@ struct GameBar: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.black.opacity(0.25))
+    }
+
+    /// Starting a new game asks for the draw count (spec): a small sheet on iPhone, a popover on
+    /// iPad, a menu item pair on the Mac. The choice is remembered for the next deal.
+    @ViewBuilder
+    private var newGameControl: some View {
+        #if os(iOS)
+        let button = Button("New Game", systemImage: "plus.rectangle.on.rectangle") { choosingNewGame = true }
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            button.sheet(isPresented: $choosingNewGame) {
+                NewGameChooser(store: store) { choosingNewGame = false }
+                    .presentationDetents([.height(300)])
+            }
+        } else {
+            button.popover(isPresented: $choosingNewGame) {
+                NewGameChooser(store: store) { choosingNewGame = false }
+                    .frame(width: 320)
+            }
+        }
+        #else
+        Menu {
+            Button("Draw 1") { store.newGame(drawCount: 1) }
+            Button("Draw 3") { store.newGame(drawCount: 3) }
+        } label: {
+            Label("New Game", systemImage: "plus.rectangle.on.rectangle")
+        }
+        #endif
     }
 
     static func clock(_ elapsed: TimeInterval) -> String {
@@ -66,3 +89,39 @@ private struct AdaptiveLabelStyle: LabelStyle {
         }
     }
 }
+
+#if os(iOS)
+/// The new-game choice on iPhone (sheet) and iPad (popover): the two draw modes, the current one
+/// marked, plus the resume-at-launch setting.
+struct NewGameChooser: View {
+    let store: GameStore
+    let done: () -> Void
+    @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("New Game").font(.headline)
+            HStack(spacing: 12) {
+                choice("Draw 1", count: 1)
+                choice("Draw 3", count: 3)
+            }
+            Toggle("Resume at launch", isOn: $resumeOnLaunch)
+                .font(.subheadline)
+            Button("Cancel", role: .cancel, action: done)
+        }
+        .padding(24)
+    }
+
+    private func choice(_ title: String, count: Int) -> some View {
+        Button {
+            store.newGame(drawCount: count)
+            done()
+        } label: {
+            Text(title).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(store.preferredDrawCount == count ? .accentColor : .gray)
+        .accessibilityHint(store.preferredDrawCount == count ? "Current choice" : "")
+    }
+}
+#endif

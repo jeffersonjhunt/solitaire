@@ -10,6 +10,10 @@ struct SolitaireApp: App {
             ContentView(store: store)
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     store.isActive = phase == .active
+                    if phase != .active { store.saveNow() }          // leaving the foreground
+                }
+                .onChange(of: store.preferredDrawCount) { _, count in
+                    AppSettings.defaults.set(count, forKey: AppSettings.drawCountKey)   // remembered for the next deal
                 }
                 #if os(macOS)
                 .frame(minWidth: 600, minHeight: 420)
@@ -19,19 +23,65 @@ struct SolitaireApp: App {
         .defaultSize(width: 1000, height: 760)
         #endif
         .commands { GameCommands(store: store) }
+
+        #if os(macOS)
+        Settings {
+            SettingsView(store: store)
+                .frame(width: 320)
+                .padding(20)
+        }
+        #endif
     }
 
+    /// Resume the saved game if the player wants that and it is valid; otherwise deal fresh in the
+    /// remembered draw mode. Undo always starts empty.
     private static func makeStore() -> GameStore {
+        let url = SaveLocation.url()
         #if DEBUG
-        if let store = UITestScenario.storeFromEnvironment() { return store }
+        if let store = UITestScenario.storeFromEnvironment() {
+            store.saver = url.map(GameSaver.init)
+            return store
+        }
         #endif
-        return GameStore()
+        let defaults = AppSettings.defaults
+        let drawCount = defaults.object(forKey: AppSettings.drawCountKey) as? Int ?? 1
+        let resume = defaults.object(forKey: AppSettings.resumeKey) as? Bool ?? true
+        let store: GameStore
+        switch LaunchPlan.decide(saved: url.flatMap(GameSaver.load(from:)), resumePreferred: resume,
+                                 drawCount: drawCount) {
+        case .resume(let saved):
+            store = GameStore(drawCount: drawCount)
+            store.resume(from: saved)
+        case .deal(let count):
+            store = GameStore(drawCount: count)
+        }
+        store.saver = url.map(GameSaver.init)
+        return store
+    }
+}
+
+/// Settings live in UserDefaults (spec): the draw count for the next deal (default 1) and whether
+/// to resume the game in progress at launch (default yes). Debug builds let UI tests use their own
+/// suite, so a test choosing Draw 3 never changes the player's real preference.
+enum AppSettings {
+    static let drawCountKey = "drawCount"
+    static let resumeKey = "resumeOnLaunch"
+
+    static var defaults: UserDefaults {
+        #if DEBUG
+        if let suite = ProcessInfo.processInfo.environment["SOLITAIRE_DEFAULTS_SUITE"],
+           let custom = UserDefaults(suiteName: suite) {
+            return custom
+        }
+        #endif
+        return .standard
     }
 }
 
 /// Menus and keyboard shortcuts (spec: New Game ⌘N, Undo ⌘Z, Draw space, Auto-finish ⌘⏎, and
-/// Toggle draw mode in a Game menu; the standard window and help groups stay). The same
-/// commands give iPadOS its hardware-keyboard shortcuts.
+/// Toggle draw mode in a Game menu; the standard window and help groups stay). On the Mac, the
+/// File menu also carries the new-game draw-count pair. The same commands give iPadOS its
+/// hardware-keyboard shortcuts.
 struct GameCommands: Commands {
     let store: GameStore
 
@@ -39,6 +89,9 @@ struct GameCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Game") { store.newGame() }
                 .keyboardShortcut("n")
+            Divider()
+            Button("New Game: Draw 1") { store.newGame(drawCount: 1) }
+            Button("New Game: Draw 3") { store.newGame(drawCount: 3) }
         }
         CommandGroup(replacing: .undoRedo) {
             Button("Undo") { store.undo() }
@@ -59,3 +112,21 @@ struct GameCommands: Commands {
     }
 }
 
+/// The two settings. On the Mac this is the Settings window (⌘,); on iPhone and iPad the same
+/// controls sit in the new-game sheet or popover.
+struct SettingsView: View {
+    let store: GameStore
+    @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
+
+    var body: some View {
+        Form {
+            Picker("Draw", selection: Binding(
+                get: { store.preferredDrawCount },
+                set: { store.preferredDrawCount = GameStore.validDrawCount($0) })) {
+                Text("One card").tag(1)
+                Text("Three cards").tag(3)
+            }
+            Toggle("Resume the game in progress at launch", isOn: $resumeOnLaunch)
+        }
+    }
+}

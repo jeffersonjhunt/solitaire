@@ -19,6 +19,7 @@ final class GameStore {
                 // moves nothing and leaves the drag alone.
                 pendingDrag = nil
             }
+            if Self.shouldSave(from: oldValue, to: state) { scheduleSave() }
         }
     }
     /// The cards the latest change moved between piles (a move, draw, redeal, undo or deal). The
@@ -48,6 +49,11 @@ final class GameStore {
         didSet { updateClock() }
     }
 
+    /// Where the game is saved; nil (tests, the unit-test host) means no persistence.
+    @ObservationIgnored var saver: GameSaver?
+    @ObservationIgnored private var saveSequence = 0
+    /// The latest save in flight; each waits for the one before it.
+    @ObservationIgnored private(set) var lastSave: Task<Void, Never>?
     @ObservationIgnored private let makeSeed: () -> UInt64
     @ObservationIgnored private var clock: Task<Void, Never>?
     @ObservationIgnored private var finishing: Task<Void, Never>?
@@ -209,7 +215,33 @@ final class GameStore {
         finishing = nil
     }
 
-    static func movedCards(from old: GameState, to new: GameState) -> Set<Int> {
+    // MARK: Saving
+
+    /// Save after every applied change — a move, draw, redeal, undo, deal or resume — and, while
+    /// only the clock runs, on every fifth second (spec).
+    nonisolated static func shouldSave(from old: GameState, to new: GameState) -> Bool {
+        var oldIgnoringClock = old
+        oldIgnoringClock.elapsed = new.elapsed
+        if oldIgnoringClock != new { return true }
+        return old.elapsed != new.elapsed && Int(new.elapsed) % 5 == 0
+    }
+
+    /// Save now, whatever changed (the app is leaving the foreground).
+    func saveNow() {
+        scheduleSave()
+    }
+
+    private func scheduleSave() {
+        guard let saver else { return }
+        saveSequence += 1
+        let (snapshot, sequence, previous) = (state, saveSequence, lastSave)
+        lastSave = Task {
+            await previous?.value
+            try? await saver.save(snapshot, sequence: sequence)
+        }
+    }
+
+    nonisolated static func movedCards(from old: GameState, to new: GameState) -> Set<Int> {
         func piles(_ s: GameState) -> [Int: PileID] {
             var out: [Int: PileID] = [:]
             for c in s.stock { out[c.id] = .stock }
@@ -222,7 +254,7 @@ final class GameStore {
         return Set(piles(new).compactMap { id, pile in before[id] == pile ? nil : id })
     }
 
-    static func validDrawCount(_ drawCount: Int) -> Int {
+    nonisolated static func validDrawCount(_ drawCount: Int) -> Int {
         drawCount == 3 ? 3 : 1
     }
 }

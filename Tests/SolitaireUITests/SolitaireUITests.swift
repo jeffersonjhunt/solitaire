@@ -7,9 +7,15 @@ final class SolitaireUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// This test's own save file and settings, so no UI test reads or overwrites the player's
+    /// real game or preferences (on the Mac they share the real app's container).
+    private lazy var isolation = "uitest-\(UUID().uuidString)"
+
     /// Launches the app with a Debug scenario or seed, passed in the environment (see UITestScenario).
     private func launch(scenario: String? = nil, seed: UInt64? = nil) -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchEnvironment["SOLITAIRE_SAVE_FILE"] = isolation
+        app.launchEnvironment["SOLITAIRE_DEFAULTS_SUITE"] = isolation
         // Ignore saved window state, as Xcode does for the unit-test host. A run that quit with no
         // window open saves "no windows", and XCUITest's launch (unlike Finder or the Dock) does not
         // send the "open application" event that would open one anyway — the app came up windowless.
@@ -85,6 +91,76 @@ final class SolitaireUITests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
     #endif
+
+    /// Acceptance 7: force-quitting mid-game and relaunching restores the same board, move count and
+    /// elapsed time.
+    func testForceQuitAndRelaunchRestoresTheGame() throws {
+        var app = launch(seed: 4)
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        stock.press()
+        app.descendants(matching: .any)["Stock, 23 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 22 cards"].waitForExistence(timeout: 5))
+        let waste = wasteTop(app)
+        sleep(6)                                          // the clock passes a five-second save
+        let before = try seconds(app)
+        XCTAssertGreaterThanOrEqual(before, 5)
+
+        app.terminate()                                   // force quit
+        app = launch()                                    // same save file, no seed: resume
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 22 cards"].waitForExistence(timeout: 5))
+        XCTAssertTrue(text(app, equalTo: "2 moves").exists, "move count restored")
+        XCTAssertEqual(wasteTop(app), waste, "same board")
+        XCTAssertGreaterThanOrEqual(try seconds(app), 5, "elapsed time restored")
+        XCTAssertFalse(app.buttons["Undo"].isEnabled, "a resumed game starts with undo empty")
+    }
+
+    /// Starting a new game asks for the draw count — a sheet on iPhone, the File menu pair on the
+    /// Mac — and deals in that mode.
+    func testNewGameAsksForTheDrawCount() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        #if os(macOS)
+        app.menuBars.menuBarItems["File"].click()
+        app.menuBars.menuItems["New Game: Draw 3"].click()
+        #else
+        app.buttons["New Game"].press()
+        XCTAssertTrue(app.buttons["Draw 3"].waitForExistence(timeout: 5), "the draw-count choice is offered")
+        app.buttons["Draw 3"].press()
+        #endif
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        stock.press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 21 cards"].waitForExistence(timeout: 5),
+                      "a draw-3 deal turns three cards")
+    }
+
+    /// The waste top's label ("7 of Clubs, waste"), to compare boards across a relaunch.
+    private func wasteTop(_ app: XCUIApplication) -> String? {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label ENDSWITH ', waste'"))
+            .allElementsBoundByIndex.last?.label
+    }
+
+    /// An element whose text is `string`. The toolbar's counters are StaticTexts whose text iOS
+    /// exposes as the accessibility label and macOS as the value, so match either.
+    private func text(_ app: XCUIApplication, equalTo string: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ OR value == %@", string, string)).firstMatch
+    }
+
+    /// Elapsed seconds from the clock's spoken text ("Time 0 minutes 7 seconds").
+    private func seconds(_ app: XCUIApplication) throws -> Int {
+        let clock = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Time ' OR value BEGINSWITH 'Time '")).firstMatch
+        XCTAssertTrue(clock.waitForExistence(timeout: 5), "the clock")
+        let spoken = clock.label.hasPrefix("Time ") ? clock.label : (clock.value as? String ?? "")
+        let words = spoken.split(separator: " ")
+        guard words.count >= 4, let minutes = Int(words[1]), let secs = Int(words[3]) else {
+            XCTFail("unexpected clock text: \(spoken)")         // fail, never skip: a skip would hide it
+            return -1
+        }
+        return minutes * 60 + secs
+    }
 
     /// A tap on the stock draws; undo puts it back.
     func testDrawAndUndo() {
