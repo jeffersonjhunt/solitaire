@@ -9,7 +9,16 @@ final class GameStore {
     static let undoLimit = 300
     static let autoFinishStep: Duration = .milliseconds(90)
 
-    private(set) var state: GameState
+    private(set) var state: GameState {
+        didSet {
+            let moved = Self.movedCards(from: oldValue, to: state)
+            if !moved.isEmpty { movedCardIDs = moved }
+        }
+    }
+    /// The cards the latest change moved between piles (a move, draw, redeal, undo or deal). The
+    /// board raises them above everything while they animate, so they never slide under a deeper
+    /// column; the clock ticking does not reset it.
+    private(set) var movedCardIDs: Set<Int> = []
     private(set) var undoStack: [GameState] = []
     /// True while the app is in the foreground; the clock only runs then.
     var isActive = true {
@@ -26,7 +35,8 @@ final class GameStore {
         state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed())
     }
 
-    var canUndo: Bool { !undoStack.isEmpty }
+    /// Nothing undoes a win: a won game cannot be un-won (spec decision).
+    var canUndo: Bool { !undoStack.isEmpty && !state.isWon }
     var canAutoFinish: Bool { SolitaireEngine.canAutoFinish(state) }
 
     // MARK: Intents
@@ -35,6 +45,14 @@ final class GameStore {
     func newGame(drawCount: Int) {
         stopAutoFinish()
         state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed())
+        undoStack.removeAll()
+        updateClock()
+    }
+
+    /// Continues a game from a given state (a saved game, or a test position). Undo starts empty.
+    func resume(from saved: GameState) {
+        stopAutoFinish()
+        state = saved
         undoStack.removeAll()
         updateClock()
     }
@@ -68,7 +86,7 @@ final class GameStore {
     }
 
     func undo() {
-        guard let previous = undoStack.popLast() else { return }
+        guard canUndo, let previous = undoStack.popLast() else { return }
         stopAutoFinish()
         state = previous
         updateClock()
@@ -132,6 +150,19 @@ final class GameStore {
     private func stopAutoFinish() {
         finishing?.cancel()
         finishing = nil
+    }
+
+    static func movedCards(from old: GameState, to new: GameState) -> Set<Int> {
+        func piles(_ s: GameState) -> [Int: PileID] {
+            var out: [Int: PileID] = [:]
+            for c in s.stock { out[c.id] = .stock }
+            for c in s.waste { out[c.id] = .waste }
+            for (f, pile) in s.foundations.enumerated() { for c in pile { out[c.id] = .foundation(f) } }
+            for (t, pile) in s.tableau.enumerated() { for c in pile { out[c.id] = .tableau(t) } }
+            return out
+        }
+        let before = piles(old)
+        return Set(piles(new).compactMap { id, pile in before[id] == pile ? nil : id })
     }
 
     static func validDrawCount(_ drawCount: Int) -> Int {
