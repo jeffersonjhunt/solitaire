@@ -19,6 +19,23 @@ final class GameStore {
     /// board raises them above everything while they animate, so they never slide under a deeper
     /// column; the clock ticking does not reset it.
     private(set) var movedCardIDs: Set<Int> = []
+    /// The draw mode the next deal uses (toggled from the Game menu; persisted in U5).
+    var preferredDrawCount: Int
+    /// The card being dragged (with its run), from `beginDrag` until `drop` or `cancelDrag`.
+    private(set) var pendingDrag: PendingDrag?
+    /// The latest thing worth a haptic (iOS): a move, a draw, a win. Nothing on failure.
+    private(set) var feedback: FeedbackEvent?
+
+    struct PendingDrag: Equatable {
+        let source: PileID
+        let index: Int
+    }
+
+    struct FeedbackEvent: Equatable {
+        enum Kind: Equatable { case move, draw, win }
+        let kind: Kind
+        let sequence: Int                 // distinguishes two identical events in a row
+    }
     private(set) var undoStack: [GameState] = []
     /// True while the app is in the foreground; the clock only runs then.
     var isActive = true {
@@ -32,6 +49,7 @@ final class GameStore {
     /// - Parameter makeSeed: where deal seeds come from; tests inject a fixed sequence.
     init(drawCount: Int = 1, makeSeed: @escaping () -> UInt64 = { UInt64.random(in: .min ... .max) }) {
         self.makeSeed = makeSeed
+        preferredDrawCount = Self.validDrawCount(drawCount)
         state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed())
     }
 
@@ -41,10 +59,18 @@ final class GameStore {
 
     // MARK: Intents
 
-    /// Deals a new game. An out-of-range draw count (e.g. a corrupted setting) becomes 1.
+    /// Deals a new game in the preferred draw mode.
+    func newGame() {
+        newGame(drawCount: preferredDrawCount)
+    }
+
+    /// Deals a new game. An out-of-range draw count (e.g. a corrupted setting) becomes 1; the
+    /// choice is remembered for the next deal.
     func newGame(drawCount: Int) {
         stopAutoFinish()
-        state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed())
+        pendingDrag = nil
+        preferredDrawCount = Self.validDrawCount(drawCount)
+        state = SolitaireEngine.newGame(drawCount: preferredDrawCount, seed: makeSeed())
         undoStack.removeAll()
         updateClock()
     }
@@ -68,9 +94,28 @@ final class GameStore {
         return true
     }
 
+    /// Game menu: switch the draw mode for the next deal (the game in progress is unchanged).
+    func toggleDrawMode() {
+        preferredDrawCount = preferredDrawCount == 1 ? 3 : 1
+    }
+
+    /// A drag has passed its threshold on this card. Returns false (and holds nothing) for a card
+    /// that cannot be picked up: face down, buried in the waste or a foundation, or the stock.
+    @discardableResult
+    func beginDrag(pile: PileID, index: Int) -> Bool {
+        guard SolitaireEngine.canPickUp(from: pile, index: index, in: state) else { return false }
+        pendingDrag = PendingDrag(source: pile, index: index)
+        return true
+    }
+
+    func cancelDrag() {
+        pendingDrag = nil
+    }
+
     /// A drag released over `destination`. Returns false for an illegal drop (the card springs back).
     @discardableResult
     func drop(source: PileID, index: Int, on destination: PileID) -> Bool {
+        pendingDrag = nil
         let move = Move(source: source, index: index, destination: destination)
         guard SolitaireEngine.canMove(move, in: state) else { return false }
         perform(move)
@@ -82,6 +127,7 @@ final class GameStore {
         guard !state.isWon, !(state.stock.isEmpty && state.waste.isEmpty) else { return }
         record()
         SolitaireEngine.drawFromStock(&state)
+        announce(.draw)
         updateClock()
     }
 
@@ -136,7 +182,12 @@ final class GameStore {
     private func perform(_ move: Move) {
         record()
         SolitaireEngine.apply(move, to: &state)
+        announce(state.isWon ? .win : .move)
         updateClock()
+    }
+
+    private func announce(_ kind: FeedbackEvent.Kind) {
+        feedback = FeedbackEvent(kind: kind, sequence: (feedback?.sequence ?? 0) + 1)
     }
 
     /// Snapshot the state before a change; the oldest snapshot falls off past the limit.

@@ -207,6 +207,28 @@ typealias E = SolitaireEngine
     }
 }
 
+// MARK: - Pick-up (drag): face-up cards only, and only the top of the waste or a foundation
+
+@Suite struct PickUp {
+    @Test func whatMayBeDragged() {
+        let s = board(tableau: [[down("2C"), up("9H"), up("8C")], [up("KS"), up("QH"), up("5D")]],
+                      waste: [up("7C"), up("7H")], stock: [down("3D")],
+                      foundations: [foundation(.spades, upTo: 2)])
+        #expect(E.canPickUp(from: .tableau(0), index: 1, in: s))        // 9♥ with 8♣ on it
+        #expect(E.canPickUp(from: .tableau(0), index: 2, in: s))
+        #expect(!E.canPickUp(from: .tableau(0), index: 0, in: s))       // face down
+        #expect(!E.canPickUp(from: .tableau(1), index: 0, in: s))       // K-Q-5 is not a built run
+        #expect(E.canPickUp(from: .waste, index: 1, in: s))
+        #expect(!E.canPickUp(from: .waste, index: 0, in: s))            // under the waste top
+        #expect(E.canPickUp(from: .foundation(0), index: 1, in: s))
+        #expect(!E.canPickUp(from: .foundation(0), index: 0, in: s))
+        #expect(!E.canPickUp(from: .stock, index: 0, in: s))
+        var won = s
+        won.isWon = true
+        #expect(!E.canPickUp(from: .tableau(0), index: 2, in: won))
+    }
+}
+
 // MARK: - Tap-to-move (acceptance: never a no-op; king to an empty column by drag, not by tap)
 
 @Suite struct TapToMove {

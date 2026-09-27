@@ -15,9 +15,20 @@ struct ContentView: View {
             if Self.barAtBottom { GameBar(store: store) }
         }
         .background(TableBackground().ignoresSafeArea())
+        #if os(iOS)
+        // Haptics, iOS and iPadOS only: light on a move, soft on a draw, success on a win.
+        .sensoryFeedback(trigger: store.feedback) { _, event in
+            switch event?.kind {
+            case .move: .impact(weight: .light)
+            case .draw: .impact(flexibility: .soft)
+            case .win: .success
+            case nil: nil
+            }
+        }
+        #endif
         .sheet(isPresented: winSheetShown) {
             WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed) {
-                store.newGame(drawCount: store.state.drawCount)
+                store.newGame()
             }
         }
     }

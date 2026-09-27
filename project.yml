@@ -46,6 +46,7 @@ targets:
     scheme:
       testTargets:
         - SolitaireTests
+        - SolitaireUITests
   SolitaireTests:
     type: bundle.unit-test
     supportedDestinations: [iOS, macOS]
@@ -60,3 +61,14 @@ targets:
         # destination; a macOS app keeps its binary under Contents/MacOS.
         TEST_HOST[sdk=macosx*]: $(BUILT_PRODUCTS_DIR)/Solitaire.app/Contents/MacOS/Solitaire
         BUNDLE_LOADER[sdk=macosx*]: $(TEST_HOST)
+  SolitaireUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - Tests/SolitaireUITests
+    dependencies:
+      - target: Solitaire
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Solitaire

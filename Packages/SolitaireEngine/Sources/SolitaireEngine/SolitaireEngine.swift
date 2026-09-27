@@ -89,6 +89,13 @@ public enum SolitaireEngine {
         state.moveCount += 1
     }
 
+    /// Whether the card at `index` in `source` may be picked up (dragged): a face-up card with a
+    /// built run on top of it in a column, or the top card of the waste or a foundation. Never the
+    /// stock, and nothing once the game is won.
+    public static func canPickUp(from source: PileID, index: Int, in state: GameState) -> Bool {
+        !state.isWon && movableRun(from: source, index: index, in: state) != nil
+    }
+
     // MARK: Tap-to-move
 
     /// Where a tap on the card at `index` in `source` sends it (with the run above it), or nil.

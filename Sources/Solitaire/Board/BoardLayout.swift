@@ -30,6 +30,27 @@ struct BoardLayout: Equatable {
         }
     }
 
+    /// The area a pile occupies: its slot, and for a column everything down to its last card.
+    func frame(of pile: PileID) -> CGRect {
+        placements.filter { $0.pile == pile }.reduce(slot(pile)) { $0.union($1.frame) }
+    }
+
+    /// Where a drag lands when released with the dragged card's centre at `point`: the foundation or
+    /// column whose frame is nearest that point (distance 0 inside it; leftmost on a tie). The pile
+    /// the drag came from is excluded. Whether the move is legal is the store's call.
+    func dropTarget(for point: CGPoint, from source: PileID) -> PileID? {
+        let piles: [PileID] = (0..<4).map { .foundation($0) } + (0..<7).map { .tableau($0) }
+        return piles.filter { $0 != source }.min { a, b in
+            Self.distance(point, frame(of: a)) < Self.distance(point, frame(of: b))
+        }
+    }
+
+    static func distance(_ p: CGPoint, _ r: CGRect) -> CGFloat {
+        let dx = max(r.minX - p.x, 0, p.x - r.maxX)
+        let dy = max(r.minY - p.y, 0, p.y - r.maxY)
+        return (dx * dx + dy * dy).squareRoot()
+    }
+
     /// - Parameter raised: the cards currently moving. Every pile that received one is drawn above
     ///   the rest, so a card travelling to another pile never passes under a deeper column. Whole
     ///   piles are raised, not single cards, so the order within a pile never changes (a new deal
