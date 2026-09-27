@@ -14,9 +14,13 @@ struct BoardView: View {
     let store: GameStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragTranslation: CGSize = .zero
+    /// True while a drag gesture is live; resets on its own when the system cancels the gesture
+    /// (which skips `onEnded`), so a cancelled drag still ends and springs home.
+    @GestureState private var isDragging = false
     @State private var hoveredID: Int?
     @State private var wiggles: [Int: Int] = [:]      // card id → wiggle count (the animation trigger)
-    @State private var clicks = ClickFilter(interval: BoardView.doubleClickInterval)
+    @State private var router = TapRouter(clicks: ClickFilter(interval: BoardView.doubleClickInterval),
+                                          filtersRepeatClicks: !BoardView.isTouch)
 
     static let moveAnimation = Animation.easeOut(duration: 0.2)
     static let flipAnimation = Animation.easeOut(duration: 0.25)
@@ -42,6 +46,16 @@ struct BoardView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             .coordinateSpace(.named(Self.space))
             .animation(reduceMotion ? nil : Self.moveAnimation, value: store.state)
+            // However a drag ends — dropped, refused, cancelled by the system, or cut short by a
+            // state change such as undo — the lifted cards settle: home in 0.2 s, or with the move.
+            .onChange(of: store.pendingDrag) { _, drag in
+                if drag == nil, dragTranslation != .zero {
+                    withAnimation(reduceMotion ? nil : Self.springBack) { dragTranslation = .zero }
+                }
+            }
+            .onChange(of: isDragging) { _, dragging in
+                if !dragging, store.pendingDrag != nil { store.cancelDrag() }
+            }
         }
     }
 
@@ -89,6 +103,7 @@ struct BoardView: View {
 
     private func drag(_ p: CardPlacement, _ layout: BoardLayout) -> some Gesture {
         DragGesture(minimumDistance: Self.dragThreshold, coordinateSpace: .named(Self.space))
+            .updating($isDragging) { _, dragging, _ in dragging = true }
             .onChanged { value in
                 if store.pendingDrag == nil {
                     guard store.beginDrag(pile: p.pile, index: p.index) else { return }
@@ -97,10 +112,15 @@ struct BoardView: View {
                 dragTranslation = value.translation
             }
             .onEnded { value in
-                guard let drag = store.pendingDrag, drag == p.asDrag else { return }
+                guard let drag = store.pendingDrag else { return }
+                guard drag == p.asDrag else {
+                    // The card changed place mid-drag: end the drag rather than leave it pending.
+                    store.cancelDrag()
+                    return
+                }
                 let center = CGPoint(x: p.frame.midX + value.translation.width,
                                      y: p.frame.midY + value.translation.height)
-                let target = layout.dropTarget(for: center, from: drag.source)
+                let target = layout.dropTarget(for: center)
                 // Legal: the card animates from where it was dropped to its new pile.
                 // Illegal: it springs home in 0.2 s.
                 if let target, SolitaireEngine.canMove(Move(source: drag.source, index: drag.index,
@@ -121,12 +141,14 @@ struct BoardView: View {
     // MARK: Tap
 
     private func tapped(_ p: CardPlacement, _ layout: BoardLayout, at point: CGPoint?) {
-        #if os(macOS)
-        if let point, !clicks.accept(at: point) { return }   // second click of a double-click
-        #endif
-        if case .stock = p.pile {
+        switch router.route(p.pile, at: point) {
+        case .draw:
             store.tapStock()
             return
+        case .ignore:
+            return
+        case .move:
+            break
         }
         if store.tap(pile: p.pile, index: p.index) { return }
         // Nowhere to go: wiggle the card and its run (face-up waste and column cards only; a tap

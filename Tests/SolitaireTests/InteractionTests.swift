@@ -16,6 +16,27 @@ import SolitaireEngine
         #expect(store.pendingDrag == nil)
     }
 
+    /// Undo, a draw or any other change that moves cards ends a drag in progress (else the drag
+    /// stayed pending and no other card could be dragged); the clock's tick does not.
+    @Test func changesThatMoveCardsEndADrag() throws {
+        let store = makeStore()
+        let move = try #require(legalMoves(store.state).first)
+        store.drop(source: move.source, index: move.index, on: move.destination)
+        #expect(store.beginDrag(pile: .tableau(6), index: 6))
+        store.tick()
+        #expect(store.pendingDrag != nil, "a tick moves nothing")
+        store.undo()
+        #expect(store.pendingDrag == nil, "undo ends it")
+        #expect(store.beginDrag(pile: .tableau(6), index: 6))
+        store.tapStock()
+        #expect(store.pendingDrag == nil, "a draw ends it")
+        #expect(store.beginDrag(pile: .tableau(6), index: 6))
+        store.resume(from: store.state)
+        #expect(store.pendingDrag != nil, "resuming the same position moves nothing")
+        store.newGame()
+        #expect(store.pendingDrag == nil)
+    }
+
     @Test func aDropEndsTheDragLegalOrNot() throws {
         let store = makeStore()
         let move = try #require(legalMoves(store.state).first)
@@ -70,16 +91,24 @@ import SolitaireEngine
 @Suite struct DropTargets {
     let metrics = BoardMetrics(size: CGSize(width: 800, height: 900), isTouch: false)
 
-    @Test func theNearestPileWinsAndTheSourceIsExcluded() {
+    @Test func theNearestPileWins() {
         let s = SolitaireEngine.newGame(drawCount: 1, seed: 4)
         let layout = BoardLayout(state: s, metrics: metrics)
         let col3 = layout.frame(of: .tableau(3))
-        #expect(layout.dropTarget(for: CGPoint(x: col3.midX, y: col3.maxY + 40), from: .tableau(0)) == .tableau(3))
+        #expect(layout.dropTarget(for: CGPoint(x: col3.midX, y: col3.maxY + 40)) == .tableau(3))
         let f2 = layout.slot(.foundation(2))
-        #expect(layout.dropTarget(for: CGPoint(x: f2.midX, y: f2.midY), from: .waste) == .foundation(2))
-        // Over its own column, a drag goes to the nearest *other* pile.
+        #expect(layout.dropTarget(for: CGPoint(x: f2.midX, y: f2.midY)) == .foundation(2))
+    }
+
+    /// Released back over its own column, a card lands on its own column — an illegal move, so it
+    /// springs back — instead of jumping to whichever other pile is next nearest.
+    @Test func releasingOverItsOwnColumnSpringsBack() {
+        let s = SolitaireEngine.newGame(drawCount: 1, seed: 4)
+        let layout = BoardLayout(state: s, metrics: metrics)
         let own = layout.frame(of: .tableau(5))
-        #expect(layout.dropTarget(for: CGPoint(x: own.midX, y: own.midY), from: .tableau(5)) != .tableau(5))
+        let target = layout.dropTarget(for: CGPoint(x: own.midX, y: own.midY))
+        #expect(target == .tableau(5))
+        #expect(!SolitaireEngine.canMove(Move(source: .tableau(5), index: 5, destination: .tableau(5)), in: s))
     }
 
     @Test func aColumnFrameReachesItsLastCard() {
@@ -100,14 +129,41 @@ import SolitaireEngine
         return clicks.map { f.accept(at: CGPoint(x: $0.0, y: $0.1), time: t0.addingTimeInterval($0.2)) }
     }
 
-    @Test func aDoubleClickActsOnce() {
-        // first click acts, the second (0.2 s later, 2 pt away) is swallowed, a third acts again
-        #expect(acted([(10, 10, 0), (12, 11, 0.2), (12, 11, 0.3)]) == [true, false, true])
+    @Test func aDoubleOrTripleClickActsOnce() {
+        // the first click acts; the second (0.2 s later, 2 pt away) and a third are swallowed
+        #expect(acted([(10, 10, 0), (12, 11, 0.2), (12, 11, 0.3)]) == [true, false, false])
+        // …until the clicks pause for longer than the interval
+        #expect(acted([(10, 10, 0), (10, 10, 0.2), (10, 10, 0.9)]) == [true, false, true])
     }
 
     @Test func separateClicksAllAct() {
         // somewhere else, then too late to be a double-click
         #expect(acted([(10, 10, 0), (200, 10, 0.1), (200, 10, 1.0)]) == [true, true, true])
+    }
+}
+
+@Suite struct Routing {
+    let t0 = Date(timeIntervalSinceReferenceDate: 1000)
+
+    func routes(_ taps: [(PileID, Double)], mac: Bool = true) -> [TapRouter.Action] {
+        var r = TapRouter(clicks: ClickFilter(interval: 0.5), filtersRepeatClicks: mac)
+        return taps.map { r.route($0.0, at: CGPoint(x: 10, y: 10), time: t0.addingTimeInterval($0.1)) }
+    }
+
+    /// Every click on the stock draws, however fast — the double-click filter is for card moves.
+    @Test func fastClicksOnTheStockAllDraw() {
+        #expect(routes([(.stock, 0), (.stock, 0.1), (.stock, 0.2)]) == [.draw, .draw, .draw])
+    }
+
+    @Test func aMacDoubleClickOnACardMovesOnce() {
+        #expect(routes([(.tableau(2), 0), (.tableau(2), 0.2)]) == [.move, .ignore])
+        #expect(routes([(.tableau(2), 0), (.tableau(2), 0.2)], mac: false) == [.move, .move], "iOS taps all act")
+    }
+
+    @Test func accessibilityActionsAlwaysAct() {
+        var r = TapRouter(clicks: ClickFilter(interval: 0.5), filtersRepeatClicks: true)
+        #expect(r.route(.waste, at: nil) == .move)
+        #expect(r.route(.waste, at: nil) == .move)
     }
 }
 

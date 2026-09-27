@@ -42,12 +42,49 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(emptyColumn.exists)
 
         king.press()
-        XCTAssertTrue(app.descendants(matching: .any)["King of Hearts, column 1"].exists, "a tap must not move it")
+        // Give a (wrong) move time to happen before asserting that none did.
+        XCTAssertFalse(app.descendants(matching: .any)["King of Hearts, column 2"].waitForExistence(timeout: 1),
+                       "a tap must not move it")
+        XCTAssertTrue(app.descendants(matching: .any)["King of Hearts, column 1"].exists)
+        XCTAssertTrue(emptyColumn.exists, "column 2 is still empty")
 
         king.drag(to: emptyColumn)
         XCTAssertTrue(app.descendants(matching: .any)["King of Hearts, column 2"].waitForExistence(timeout: 5),
                       "the drag should have moved it")
     }
+
+    /// Repeated clicks on the stock each draw in the running app. (XCUITest spaces clicks ~0.55 s
+    /// apart — just over the macOS double-click interval — so the "however fast" half of the rule
+    /// is covered by the `Routing` unit tests, not here.)
+    func testFastClicksOnTheStockEachDraw() {
+        let app = launch(seed: 4)
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        stock.press()
+        app.descendants(matching: .any)["Stock, 23 cards"].press()
+        app.descendants(matching: .any)["Stock, 22 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 21 cards"].waitForExistence(timeout: 5))
+    }
+
+    #if os(macOS)
+    /// The Game and Edit menus follow the game: Undo enables after a move, Auto-finish only when it
+    /// is available.
+    func testMenuItemsFollowTheGame() {
+        let app = launch(scenario: "almostWon")
+        XCTAssertTrue(app.buttons["Auto-finish"].waitForExistence(timeout: 5))
+        func menuItem(_ menu: String, _ item: String) -> XCUIElement {
+            app.menuBars.menuBarItems[menu].click()
+            return app.menuBars.menuItems[item]
+        }
+        XCTAssertTrue(menuItem("Game", "Auto-finish").isEnabled)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(menuItem("Edit", "Undo").isEnabled, "nothing to undo yet")
+        app.typeKey(.escape, modifierFlags: [])
+        app.descendants(matching: .any)["Jack of Spades, column 1"].press()   // one move to a foundation
+        XCTAssertTrue(menuItem("Edit", "Undo").isEnabled, "a move can be undone")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+    #endif
 
     /// A tap on the stock draws; undo puts it back.
     func testDrawAndUndo() {

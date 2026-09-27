@@ -36,11 +36,12 @@ struct BoardLayout: Equatable {
     }
 
     /// Where a drag lands when released with the dragged card's centre at `point`: the foundation or
-    /// column whose frame is nearest that point (distance 0 inside it; leftmost on a tie). The pile
-    /// the drag came from is excluded. Whether the move is legal is the store's call.
-    func dropTarget(for point: CGPoint, from source: PileID) -> PileID? {
+    /// column whose frame is nearest that point (distance 0 inside it; leftmost on a tie). That may
+    /// be the pile it came from — a drop there is illegal, so the card springs back rather than
+    /// jumping to some other pile. Whether the move is legal is the store's call.
+    func dropTarget(for point: CGPoint) -> PileID? {
         let piles: [PileID] = (0..<4).map { .foundation($0) } + (0..<7).map { .tableau($0) }
-        return piles.filter { $0 != source }.min { a, b in
+        return piles.min { a, b in
             Self.distance(point, frame(of: a)) < Self.distance(point, frame(of: b))
         }
     }

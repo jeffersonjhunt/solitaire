@@ -12,7 +12,13 @@ final class GameStore {
     private(set) var state: GameState {
         didSet {
             let moved = Self.movedCards(from: oldValue, to: state)
-            if !moved.isEmpty { movedCardIDs = moved }
+            if !moved.isEmpty {
+                movedCardIDs = moved
+                // Any change that moves cards (undo, a draw, an auto-finish step, a resume) ends a
+                // drag in progress — the card it held may not be where it was. The clock's tick
+                // moves nothing and leaves the drag alone.
+                pendingDrag = nil
+            }
         }
     }
     /// The cards the latest change moved between piles (a move, draw, redeal, undo or deal). The
