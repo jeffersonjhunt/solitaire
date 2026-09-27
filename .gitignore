@@ -71,3 +71,6 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# SDLC lifecycle state (campaign + per-unit files)
+.sdlc/
