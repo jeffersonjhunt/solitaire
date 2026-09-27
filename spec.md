@@ -183,3 +183,14 @@ Build the engine and its tests before any view. The app is done when all of thes
 
 Open decisions for whoever builds it: whether to ship a win animation (a cascade of cards is the classic, and SpriteKit would be the only added framework), whether to add a hint button, and whether the Mac version gets a full-screen felt background or stays in a bordered window.
 
+## Decisions
+
+Recorded as they are made; each overrides anything above it conflicts with.
+
+| Date | Decision |
+| --- | --- |
+| 2026-09-27 | Bundle identifier `com.oneoffendeavors.solitaire`. |
+| 2026-09-27 | Open decisions: the win animation is a SwiftUI card cascade (no SpriteKit); no hint button in v1; the Mac version stays in a bordered window. |
+| 2026-09-27 | Tapping or clicking a card on a foundation does nothing. Taps send cards toward the foundations; taking one back down is drag-only, so a missed tap never undoes progress. |
+| 2026-09-27 | Once the game is won, no move or draw is allowed, so a won game cannot be un-won. |
+| 2026-09-27 | An invalid stored draw count is clamped by the store before dealing; the engine's `newGame` keeps its 1-or-3 precondition. A resumed save must also have exactly 4 foundations and 7 columns. |
