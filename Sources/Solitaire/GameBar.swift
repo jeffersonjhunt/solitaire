@@ -4,7 +4,6 @@ import SwiftUI
 /// bottom within thumb reach on iPhone, at the top on iPad and Mac (see `ContentView`).
 struct GameBar: View {
     let store: GameStore
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     private var isCompact: Bool { sizeClass == .compact }
@@ -23,10 +22,8 @@ struct GameBar: View {
                 if store.canAutoFinish {
                     Button("Auto-finish", systemImage: "wand.and.stars") { store.autoFinish() }
                 }
-                Button("Undo", systemImage: "arrow.uturn.backward") {
-                    if reduceMotion { store.undo() } else { withAnimation(BoardView.moveAnimation) { store.undo() } }
-                }
-                .disabled(!store.canUndo)
+                Button("Undo", systemImage: "arrow.uturn.backward") { store.undo() }
+                    .disabled(!store.canUndo)           // also off once the game is won
                 Menu {
                     Button("Draw 1") { store.newGame(drawCount: 1) }
                     Button("Draw 3") { store.newGame(drawCount: 3) }

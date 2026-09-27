@@ -69,6 +69,25 @@ func legalMoves(_ s: GameState) -> [Move] {
     }
 }
 
+@MainActor @Suite struct Winning {
+    /// A won game cannot be un-won: undo is refused (and a second win would lose its sheet).
+    @Test func undoDoesNothingOnceWon() {
+        let store = makeStore()
+        var s = store.state
+        s.stock = []; s.waste = []
+        s.foundations = [Suit.spades, .hearts, .diamonds, .clubs].map { suit in
+            (1...13).map { Card(suit: suit, rank: $0, isFaceUp: true) } }
+        let king = s.foundations[3].removeLast()
+        s.tableau = [[king], [], [], [], [], [], []]
+        store.resume(from: s)
+        #expect(store.tap(pile: .tableau(0), index: 0))
+        #expect(store.state.isWon && !store.canUndo)
+        let won = store.state
+        store.undo()
+        #expect(store.state == won)
+    }
+}
+
 @MainActor @Suite struct Intents {
     @Test func anInvalidDrawCountIsClampedNotACrash() {
         #expect(makeStore(drawCount: 7).state.drawCount == 1)

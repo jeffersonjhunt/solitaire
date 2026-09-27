@@ -11,7 +11,8 @@ struct BoardMetrics: Equatable, Sendable {
     static let faceUpFanRatio: CGFloat = 0.29
     /// The deepest column that must always stay readable (decision D1): six face-down cards
     /// under a nine-card run (K→5), with its face-up fan no smaller than `readableFanRatio`.
-    static let readableColumn = (faceDown: CGFloat(6), faceUp: CGFloat(9))
+    /// Fans are the steps between cards: 6 below the face-down cards, 8 between the 9 face-up.
+    static let readableColumn = (faceDownCards: 6, faceUpCards: 9)
     /// A face-up fan of 0.2 × card height still shows each card's rank and suit.
     static let readableFanRatio: CGFloat = 0.2
 
@@ -31,8 +32,8 @@ struct BoardMetrics: Equatable, Sendable {
     var leftEdge: CGFloat { (size.width - usedWidth) / 2 }
     var topRowY: CGFloat { gap }
     var tableauY: CGFloat { gap + cardHeight + gap }
-    /// The tap target for one card: its column slot, at least 44 pt when compressed.
-    var hitWidth: CGFloat { isCompressed ? cardWidth + gap : cardWidth }
+    /// The tap target for one card: its whole column slot, and never under 44 pt, when compressed.
+    var hitWidth: CGFloat { isCompressed ? max(cardWidth + gap, Self.minHitTarget) : cardWidth }
 
     init(size: CGSize, isTouch: Bool) {
         self.size = size
@@ -55,7 +56,9 @@ struct BoardMetrics: Equatable, Sendable {
     private static func cardWidth(boardWidth: CGFloat, gap: CGFloat, height: CGFloat) -> CGFloat {
         let byWidth = (boardWidth - 8 * gap) / 7
         let squeeze = readableFanRatio / faceUpFanRatio
-        let fans = squeeze * (readableColumn.faceDown * faceDownFanRatio + readableColumn.faceUp * faceUpFanRatio)
+        let downFans = CGFloat(readableColumn.faceDownCards)
+        let upFans = CGFloat(readableColumn.faceUpCards - 1)
+        let fans = squeeze * (downFans * faceDownFanRatio + upFans * faceUpFanRatio)
         let heightInCards = 2 + fans                                        // top row + card + fans
         let byHeight = (height - 3 * gap) / heightInCards / aspect
         return min(byWidth, byHeight)

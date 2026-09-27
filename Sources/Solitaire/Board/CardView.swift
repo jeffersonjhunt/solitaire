@@ -25,15 +25,15 @@ struct CardView: View {
         .accessibilityLabel(card.isFaceUp ? Self.spokenName(card) : "Face-down card")
     }
 
-    static func rankText(_ rank: Int) -> String {
+    nonisolated static func rankText(_ rank: Int) -> String {
         [1: "A", 11: "J", 12: "Q", 13: "K"][rank] ?? "\(rank)"
     }
 
-    static func suitSymbol(_ suit: Suit) -> String {
+    nonisolated static func suitSymbol(_ suit: Suit) -> String {
         ["♠", "♥", "♦", "♣"][suit.rawValue]
     }
 
-    static func spokenName(_ card: Card) -> String {
+    nonisolated static func spokenName(_ card: Card) -> String {
         let rank = [1: "Ace", 11: "Jack", 12: "Queen", 13: "King"][card.rank] ?? "\(card.rank)"
         return "\(rank) of \(["Spades", "Hearts", "Diamonds", "Clubs"][card.suit.rawValue])"
     }

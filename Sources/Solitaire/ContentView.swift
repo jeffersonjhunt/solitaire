@@ -5,24 +5,13 @@ import SolitaireEngine
 /// and on a win the cascade plus the win sheet with the move count and time.
 struct ContentView: View {
     let store: GameStore
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dismissedWinSeed: UInt64?
 
     var body: some View {
         VStack(spacing: 0) {
             if !Self.barAtBottom { GameBar(store: store) }
-            BoardView(store: store)
+            BoardView(store: store)                     // draws the win cascade itself
                 .padding(.horizontal, 4)
-                .overlay {
-                    if store.state.isWon && !reduceMotion {
-                        GeometryReader { geo in
-                            WinCascade(foundations: store.state.foundations,
-                                       layout: BoardLayout(state: store.state,
-                                                           metrics: BoardMetrics(size: geo.size, isTouch: BoardView.isTouch)))
-                        }
-                        .id(store.state.seed)          // a fresh cascade for every win
-                    }
-                }
             if Self.barAtBottom { GameBar(store: store) }
         }
         .background(TableBackground().ignoresSafeArea())
