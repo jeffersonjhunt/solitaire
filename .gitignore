@@ -74,3 +74,10 @@ DerivedData/
 
 # SDLC lifecycle state (campaign + per-unit files)
 .sdlc/
+
+# apple-xcodebuild
+*.xcodeproj/
+dist/
+.swiftpm/
+.devteam
+.signid
