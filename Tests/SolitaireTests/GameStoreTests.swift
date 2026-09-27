@@ -1,0 +1,120 @@
+import Testing
+import SolitaireEngine
+@testable import Solitaire
+
+/// A store dealing a fixed sequence of seeds, so every test is reproducible.
+@MainActor
+func makeStore(drawCount: Int = 1, seeds: [UInt64] = [42, 43, 44, 45]) -> GameStore {
+    var remaining = seeds
+    return GameStore(drawCount: drawCount) { remaining.isEmpty ? 0 : remaining.removeFirst() }
+}
+
+/// Every move the rules allow (excluding the stock tap).
+func legalMoves(_ s: GameState) -> [Move] {
+    var sources: [(PileID, Int)] = []
+    if !s.waste.isEmpty { sources.append((.waste, s.waste.count - 1)) }
+    for f in 0..<4 where !s.foundations[f].isEmpty { sources.append((.foundation(f), s.foundations[f].count - 1)) }
+    for t in 0..<7 { for i in s.tableau[t].indices { sources.append((.tableau(t), i)) } }
+    let destinations: [PileID] = (0..<4).map { .foundation($0) } + (0..<7).map { .tableau($0) }
+    return sources.flatMap { src, i in destinations.map { Move(source: src, index: i, destination: $0) } }
+        .filter { SolitaireEngine.canMove($0, in: s) }
+}
+
+@MainActor @Suite struct Undo {
+    /// Acceptance: undo from any point returns the exact previous state, including face-up flips
+    /// and redeals, for 100 random moves from a fixed seed.
+    @Test func hundredRandomMovesUndoExactly() {
+        let store = makeStore()
+        var rng = SplitMix64(seed: 7)
+        var history = [store.state]
+        var flips = 0, redeals = 0
+        while history.count <= 100 {
+            let before = store.state
+            let moves = legalMoves(before)
+            if !moves.isEmpty && rng.next() % 3 != 0 {
+                let m = moves[Int(rng.next() % UInt64(moves.count))]
+                #expect(store.drop(source: m.source, index: m.index, on: m.destination))
+                if case .tableau(let t) = m.source, m.index > 0, !before.tableau[t][m.index - 1].isFaceUp { flips += 1 }
+            } else {
+                if before.stock.isEmpty && !before.waste.isEmpty { redeals += 1 }
+                store.tapStock()
+                if store.state == before { continue }        // nothing to draw: not a step
+            }
+            history.append(store.state)
+        }
+        #expect(flips > 0 && redeals > 0, "the walk must include flips (\(flips)) and redeals (\(redeals))")
+        for expected in history.dropLast().reversed() {
+            store.undo()
+            #expect(store.state == expected)
+        }
+        #expect(!store.canUndo)
+    }
+
+    @Test func undoStackIsCappedAtThreeHundred() {
+        let store = makeStore()
+        for _ in 0..<350 { store.tapStock() }
+        #expect(store.undoStack.count == GameStore.undoLimit)
+        let oldestKept = store.undoStack.first
+        for _ in 0..<GameStore.undoLimit { store.undo() }
+        #expect(store.state == oldestKept)
+        #expect(!store.canUndo)
+    }
+
+    @Test func aNewDealClearsUndo() {
+        let store = makeStore()
+        store.tapStock()
+        #expect(store.canUndo)
+        store.newGame(drawCount: 3)
+        #expect(!store.canUndo && store.state.drawCount == 3 && store.state.seed == 43)
+    }
+}
+
+@MainActor @Suite struct Intents {
+    @Test func anInvalidDrawCountIsClampedNotACrash() {
+        #expect(makeStore(drawCount: 7).state.drawCount == 1)
+        let store = makeStore()
+        store.newGame(drawCount: 0)
+        #expect(store.state.drawCount == 1)
+        store.newGame(drawCount: 3)
+        #expect(store.state.drawCount == 3)
+    }
+
+    @Test func aTapWithNowhereToGoChangesNothing() {
+        let store = makeStore()
+        let before = store.state
+        #expect(!store.tap(pile: .tableau(0), index: 5))       // no such card
+        #expect(!store.tap(pile: .stock, index: 0))
+        #expect(store.state == before && !store.canUndo)
+    }
+
+    @Test func anIllegalDropSpringsBackUnchanged() {
+        let store = makeStore()
+        let before = store.state
+        #expect(!store.drop(source: .tableau(6), index: 0, on: .tableau(0)))   // a face-down card
+        #expect(store.state == before && !store.canUndo)
+    }
+
+    @Test func aLegalTapMovesAndIsOneUndoStep() throws {
+        let store = makeStore()
+        let move = try #require(legalMoves(store.state).first { SolitaireEngine.autoDestination(for: $0.source, index: $0.index, in: store.state) != nil })
+        #expect(store.tap(pile: move.source, index: move.index))
+        #expect(store.state.moveCount == 1 && store.undoStack.count == 1)
+    }
+}
+
+@MainActor @Suite struct Clock {
+    @Test func theClockRunsOnlyWhileStartedUnwonAndActive() {
+        let store = makeStore()
+        store.tick()
+        #expect(store.state.elapsed == 0, "not started before the first move")
+        store.tapStock()
+        store.tick(); store.tick()
+        #expect(store.state.elapsed == 2)
+        store.isActive = false
+        store.tick()
+        #expect(store.state.elapsed == 2, "paused in the background")
+        store.isActive = true
+        store.tick()
+        #expect(store.state.elapsed == 3)
+    }
+}
