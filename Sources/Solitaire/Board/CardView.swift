@@ -12,9 +12,12 @@ struct CardView: View {
     /// False for cards buried in a stacked pile (stock, waste, foundation): only the top card casts
     /// a shadow, or 20 stacked shadows add up to a dark smear.
     var hasShadow = true
+    /// Being dragged: a slightly stronger shadow lifts it above the board.
+    var isLifted = false
 
     var body: some View {
         FlippingCard(angle: card.isFaceUp ? 0 : 180, card: card, width: width, hasShadow: hasShadow)
+            .shadow(color: .black.opacity(isLifted ? 0.35 : 0), radius: isLifted ? 5 : 0, y: isLifted ? 3 : 0)
             .frame(width: width, height: width * BoardMetrics.aspect)
         .overlay {
             if isHighlighted {
