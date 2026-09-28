@@ -8,28 +8,35 @@ struct HowToPlayView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                ForEach(HowToPlay.sections) { section in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(section.title)
-                            .font(.headline)
-                            .accessibilityAddTraits(.isHeader)
-                        ForEach(section.lines, id: \.self) { line in
-                            Text(.init(line))                      // Markdown: **bold** keys
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: 560, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            HowToPlayContent()
+                .padding(24)
+                .frame(maxWidth: 560, alignment: .leading)
+                .frame(maxWidth: .infinity)
         }
         .navigationTitle("How to Play")
         .toolbar {
             if let done {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: done)
+                }
+            }
+        }
+    }
+}
+
+/// The sections themselves, without the scroll view (so they can also be rendered to an image).
+struct HowToPlayContent: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(HowToPlay.sections) { section in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(section.title)
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(section.lines, id: \.self) { line in
+                        Text(.init(line))                          // Markdown: **bold** keys
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
@@ -71,9 +78,18 @@ enum HowToPlay {
                 "There is no score and no losing: if you are stuck, undo or deal again. Once you win, the game is locked.",
             ]),
             Section(title: "Saving", lines: [
-                "Your game is saved as you play and resumes at the next launch (undo starts fresh). You can turn resuming off in the settings.",
+                "Your game is saved as you play and resumes at the next launch (undo starts fresh). \(resumeSetting)",
             ]),
         ]
+    }
+
+    /// Where the resume-at-launch switch lives on this platform.
+    private static var resumeSetting: String {
+        #if os(macOS)
+        "You can turn resuming off in **Settings (⌘,)**."
+        #else
+        "You can turn resuming off in the **New Game** options."
+        #endif
     }
 
     private static var controls: [String] {
@@ -81,14 +97,14 @@ enum HowToPlay {
         [
             "**Click** a card to send it to its best spot (double-click works too); **drag** to place it exactly.",
             "**Click the stock** or press **Space** to draw.",
-            "**⌘Z** undo · **⌘N** new game · **⌘↩** auto-finish · **File ▸ New Game: Draw 1 / Draw 3** · **Game ▸ Draw Three** · **Settings (⌘,)**.",
+            "**⌘Z** undo · **⌘N** new game · **⌘↩\u{FE0E}** auto-finish · **File ▸ New Game: Draw 1 / Draw 3** · **Game ▸ Draw Three** · **Settings (⌘,)**.",
             "A card with nowhere to go wiggles. Clicking a card on a foundation does nothing — drag it if you mean to.",
         ]
         #else
         [
             "**Tap** a card to send it to its best spot; **drag** to place it exactly.",
             "**Tap the stock** to draw. Undo and New Game are in the toolbar; New Game asks for Draw 1 or Draw 3.",
-            "With a keyboard: **⌘Z** undo · **⌘N** new game · **Space** draw · **⌘↩** auto-finish.",
+            "With a keyboard: **⌘Z** undo · **⌘N** new game · **Space** draw · **⌘↩\u{FE0E}** auto-finish.",
             "A card with nowhere to go wiggles. Tapping a card on a foundation does nothing — drag it if you mean to.",
         ]
         #endif

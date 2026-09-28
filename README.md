@@ -45,7 +45,7 @@ and plays the rest for you. There is no score and no losing — if you are stuck
 | Draw / turn the waste over | click the stock, or **Space** | tap the stock |
 | Undo | **⌘Z** or the toolbar | the toolbar (⌘Z with a keyboard) |
 | New game | **⌘N** (remembered draw mode), or **File ▸ New Game: Draw 1 / Draw 3** | the toolbar: choose Draw 1 or Draw 3 |
-| Auto-finish | **⌘↩** or the toolbar, when offered | the toolbar, when offered |
+| Auto-finish | **⌘↩︎** or the toolbar, when offered | the toolbar, when offered |
 | Draw mode for the next deal | **Game ▸ Draw Three**, or **Settings (⌘,)** | the new-game sheet (iPhone) or popover (iPad) |
 | How to Play | **Help ▸ Solitaire Help** (⌘?) | **How to Play** in the new-game sheet or popover |
 

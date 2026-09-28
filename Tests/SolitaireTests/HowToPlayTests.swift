@@ -18,6 +18,26 @@ import Testing
         }
     }
 
+    /// Arrows such as ↩ have an emoji form, which iOS shows as a coloured box; every one must carry
+    /// the text-style selector (U+FE0E) so it looks like the key glyph it is.
+    @Test func keyGlyphsNeverRenderAsEmoji() {
+        for arrow in ["↩", "↪", "⏎"] {
+            let bare = text.components(separatedBy: arrow).dropFirst().filter { !$0.hasPrefix("\u{FE0E}") }
+            #expect(bare.isEmpty, "\(arrow) without U+FE0E")
+        }
+        #expect(text.contains("↩\u{FE0E}"), "the auto-finish shortcut is still described")
+    }
+
+    /// The resume switch is described where it actually is on this platform.
+    @Test func pointsToThisPlatformsResumeSetting() {
+        let saving = HowToPlay.sections.first { $0.title == "Saving" }!.lines.joined()
+        #if os(macOS)
+        #expect(saving.contains("Settings (⌘,)"))
+        #else
+        #expect(saving.contains("New Game") && !saving.contains("settings."))
+        #endif
+    }
+
     /// …and this platform's controls, not the other's.
     @Test func describesThisPlatformsControls() {
         let controls = HowToPlay.sections.first { $0.title == "Controls" }!.lines.joined(separator: "\n")
