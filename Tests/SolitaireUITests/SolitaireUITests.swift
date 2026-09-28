@@ -200,6 +200,26 @@ final class SolitaireUITests: XCTestCase {
         return minutes * 60 + secs
     }
 
+    /// How to Play opens from where the spec's help lives on each platform: Help ▸ Solitaire Help
+    /// on the Mac (a window), the new-game chooser on iPhone (a sheet, closed with Done).
+    func testHowToPlayOpens() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        #if os(macOS)
+        app.menuBars.menuBarItems["Help"].click()
+        app.menuBars.menuItems["Solitaire Help"].click()
+        XCTAssertTrue(app.windows["How to Play"].waitForExistence(timeout: 5), "the help window")
+        XCTAssertTrue(text(app, equalTo: "Goal").exists)
+        #else
+        app.buttons["New Game"].press()
+        XCTAssertTrue(app.buttons["How to Play"].waitForExistence(timeout: 5))
+        app.buttons["How to Play"].press()
+        XCTAssertTrue(text(app, equalTo: "Goal").waitForExistence(timeout: 5), "the help sheet")
+        app.buttons["Done"].press()
+        XCTAssertTrue(text(app, equalTo: "Goal").waitForNonExistence(timeout: 5), "Done closes it")
+        #endif
+    }
+
     /// A tap on the stock draws; undo puts it back.
     func testDrawAndUndo() {
         let app = launch(seed: 4)

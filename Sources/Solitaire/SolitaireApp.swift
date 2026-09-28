@@ -3,11 +3,12 @@ import SwiftUI
 @main
 struct SolitaireApp: App {
     @State private var store = SolitaireApp.makeStore()
+    @State private var ui = AppUI()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store)
+            ContentView(store: store, ui: ui)
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     store.isActive = phase == .active
                     if phase != .active { store.saveNow() }          // leaving the foreground
@@ -19,9 +20,18 @@ struct SolitaireApp: App {
         #if os(macOS)
         .defaultSize(width: 1000, height: 760)
         #endif
-        .commands { GameCommands(store: store) }
+        .commands {
+            GameCommands(store: store)
+            HelpCommands(ui: ui)
+        }
 
         #if os(macOS)
+        Window("How to Play", id: HelpCommands.windowID) {
+            HowToPlayView()
+                .frame(minWidth: 420, idealWidth: 520, minHeight: 480, idealHeight: 640)
+        }
+        .defaultSize(width: 520, height: 640)
+
         Settings {
             SettingsView(store: store)
                 .frame(width: 320)
@@ -144,6 +154,38 @@ struct SettingsView: View {
                 Text("Three cards").tag(3)
             }
             Toggle("Resume the game in progress at launch", isOn: $resumeOnLaunch)
+        }
+    }
+}
+
+/// State for presentations that are not game state: the How to Play sheet on iPhone and iPad.
+@Observable @MainActor
+final class AppUI {
+    var showingHelp = false
+    /// Asked for from the new-game chooser: shown once the chooser has finished closing (two
+    /// sheets cannot be up at once).
+    var helpAfterChooser = false
+}
+
+/// Help ▸ Solitaire Help (⌘?): the How to Play window on the Mac, the help sheet on iPad with a
+/// keyboard. Replaces the standard "help isn't available" item.
+struct HelpCommands: Commands {
+    static let windowID = "how-to-play"
+    let ui: AppUI
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
+
+    var body: some Commands {
+        CommandGroup(replacing: .help) {
+            Button("Solitaire Help") {
+                #if os(macOS)
+                openWindow(id: Self.windowID)
+                #else
+                ui.showingHelp = true
+                #endif
+            }
+            .keyboardShortcut("?", modifiers: .command)
         }
     }
 }

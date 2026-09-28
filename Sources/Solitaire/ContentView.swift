@@ -5,14 +5,15 @@ import SolitaireEngine
 /// and on a win the cascade plus the win sheet with the move count and time.
 struct ContentView: View {
     let store: GameStore
+    let ui: AppUI
     @State private var dismissedWinSeed: UInt64?
 
     var body: some View {
         VStack(spacing: 0) {
-            if !Self.barAtBottom { GameBar(store: store) }
+            if !Self.barAtBottom { GameBar(store: store, ui: ui) }
             BoardView(store: store)                     // draws the win cascade itself
                 .padding(.horizontal, 4)
-            if Self.barAtBottom { GameBar(store: store) }
+            if Self.barAtBottom { GameBar(store: store, ui: ui) }
         }
         .background(TableBackground().ignoresSafeArea())
         #if os(iOS)
@@ -23,6 +24,13 @@ struct ContentView: View {
             case .draw: .impact(flexibility: .soft)
             case .win: .success
             case nil: nil
+            }
+        }
+        #endif
+        #if os(iOS)
+        .sheet(isPresented: Binding(get: { ui.showingHelp }, set: { ui.showingHelp = $0 })) {
+            NavigationStack {
+                HowToPlayView { ui.showingHelp = false }
             }
         }
         #endif
@@ -94,5 +102,5 @@ struct WinSheet: View {
 }
 
 #Preview {
-    ContentView(store: GameStore())
+    ContentView(store: GameStore(), ui: AppUI())
 }
