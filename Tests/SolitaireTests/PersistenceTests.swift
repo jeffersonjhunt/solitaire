@@ -21,6 +21,8 @@ private func tempSaveURL() -> URL {
     @Test(arguments: [
         "won", "3 foundations", "8 columns", "51 cards", "duplicate card", "rank 14", "draw 2",
         "negative moves", "negative time",
+        "face-down column top", "face-up stock", "face-down waste", "foundation out of order",
+        "mixed foundation", "unbuilt run",
     ])
     func invalidSavesAreRejected(_ defect: String) {
         var s = game
@@ -34,9 +36,63 @@ private func tempSaveURL() -> URL {
         case "draw 2": s.drawCount = 2
         case "negative moves": s.moveCount = -1
         case "negative time": s.elapsed = -1
+        case "face-down column top": s.tableau[6][6].isFaceUp = false
+        case "face-up stock": s.stock[0].isFaceUp = true
+        case "face-down waste":
+            SolitaireEngine.drawFromStock(&s)
+            s.waste[0].isFaceUp = false
+        case "foundation out of order", "mixed foundation", "unbuilt run":
+            // Rebuild the piles by hand from a legal, spread-out position.
+            s = board(defect)
         default: Issue.record("unknown defect")
         }
         #expect(!SaveValidation.isResumable(s), "\(defect)")
+    }
+}
+
+/// A 52-card position laid out by hand, with one structural defect.
+private func board(_ defect: String) -> GameState {
+    var s = SolitaireEngine.newGame(drawCount: 1, seed: 4)
+    var all = (s.stock + s.tableau.flatMap { $0 }).map { c -> Card in var c = c; c.isFaceUp = false; return c }
+    func take(_ suit: Suit, _ rank: Int) -> Card {
+        let i = all.firstIndex { $0.suit == suit && $0.rank == rank }!
+        var c = all.remove(at: i); c.isFaceUp = true; return c
+    }
+    s.foundations = [[], [], [], []]
+    s.tableau = Array(repeating: [], count: 7)
+    switch defect {
+    case "foundation out of order":
+        s.foundations[0] = [take(.spades, 1), take(.spades, 3)]
+    case "mixed foundation":
+        s.foundations[0] = [take(.spades, 1), take(.hearts, 2)]
+    default:                                              // "unbuilt run": 9♥ under 8♥ (same colour)
+        s.tableau[0] = [take(.hearts, 9), take(.hearts, 8)]
+    }
+    s.stock = all
+    s.waste = []
+    return s
+}
+
+@Suite struct ResumabilityOfRealPlay {
+    /// Validation must never reject a position real play produces (or a resumed game would be
+    /// thrown away): every state along 40 random games passes.
+    @Test func everyPositionFromRealPlayIsResumable() {
+        var checked = 0
+        for seed in UInt64(1)...40 {
+            var s = SolitaireEngine.newGame(drawCount: seed % 2 == 0 ? 1 : 3, seed: seed)
+            var rng = SplitMix64(seed: seed)
+            for _ in 0..<250 where !s.isWon {
+                #expect(SaveValidation.isResumable(s), "seed \(seed) move \(s.moveCount)")
+                checked += 1
+                let moves = legalMoves(s)
+                if !moves.isEmpty && rng.next() % 3 != 0 {
+                    SolitaireEngine.apply(moves[Int(rng.next() % UInt64(moves.count))], to: &s)
+                } else {
+                    SolitaireEngine.drawFromStock(&s)
+                }
+            }
+        }
+        #expect(checked > 5000)
     }
 }
 
@@ -62,6 +118,18 @@ private func tempSaveURL() -> URL {
         try await saver.save(newer, sequence: 2)
         try await saver.save(game, sequence: 1)
         #expect(GameSaver.load(from: url)?.moveCount == 5)
+    }
+
+    /// A save in a format this version does not know is discarded, not misread.
+    @Test func anUnknownFormatVersionLoadsAsNothing() async throws {
+        let url = tempSaveURL()
+        try await GameSaver(url: url).save(game, sequence: 1)
+        #expect(GameSaver.load(from: url) == game)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("\"version\":1") && text.contains("savedAt"))
+        try text.replacingOccurrences(of: "\"version\":1", with: "\"version\":2")
+            .write(to: url, atomically: true, encoding: .utf8)
+        #expect(GameSaver.load(from: url) == nil)
     }
 
     @Test func missingCorruptOrWonSavesLoadAsNothing() async throws {
@@ -91,6 +159,34 @@ private func tempSaveURL() -> URL {
                 "a corrupt setting is clamped")
     }
 
+    /// A fresh deal at launch is saved at once, so an older game left on disk cannot come back.
+    @MainActor @Test func aFreshDealIsSavedImmediately() async {
+        let url = tempSaveURL()
+        let store = GameStore.launch(.deal(drawCount: 3), drawCount: 3, saver: GameSaver(url: url))
+        await store.lastSave?.value
+        #expect(GameSaver.load(from: url) == store.state)
+    }
+
+    /// UI tests reset their own save and settings; the player's game.json is never touched.
+    @Test func testResetClearsOnlyTheTestsOwnData() throws {
+        let env = ["SOLITAIRE_RESET": "1", "SOLITAIRE_SAVE_FILE": "uitest-reset-\(UUID().uuidString)",
+                   "SOLITAIRE_DEFAULTS_SUITE": "uitest-reset-suite-\(UUID().uuidString)"]
+        let url = try #require(SaveLocation.url(environment: env))
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: url)
+        let suite = try #require(UserDefaults(suiteName: env["SOLITAIRE_DEFAULTS_SUITE"]!))
+        suite.set(3, forKey: AppSettings.drawCountKey)
+        SaveLocation.resetForTests(environment: env)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        #expect(UserDefaults(suiteName: env["SOLITAIRE_DEFAULTS_SUITE"]!)?.object(forKey: AppSettings.drawCountKey) == nil)
+        var withoutName = env
+        withoutName["SOLITAIRE_SAVE_FILE"] = nil                   // would resolve to game.json
+        let real = try #require(SaveLocation.url(environment: withoutName))
+        let existed = FileManager.default.fileExists(atPath: real.path)
+        SaveLocation.resetForTests(environment: withoutName)
+        #expect(FileManager.default.fileExists(atPath: real.path) == existed, "game.json is never reset")
+    }
+
     /// The unit-test host shares the real Mac app's container: it must never read or write the
     /// player's save. UI tests name their own file.
     @Test func testsNeverTouchTheRealSave() {
@@ -113,6 +209,28 @@ private func tempSaveURL() -> URL {
             t.elapsed = Double(second)
             #expect(GameStore.shouldSave(from: before, to: t) == (second % 5 == 0), "tick \(second)")
         }
+    }
+
+    /// The draw-count setting is written whenever it changes — not from a view that may be gone.
+    @Test func theDrawCountIsRememberedWheneverItChanges() {
+        let store = makeStore()
+        var remembered: [Int] = []
+        store.rememberDrawCount = { remembered.append($0) }
+        store.toggleDrawMode()
+        store.newGame(drawCount: 1)
+        store.newGame(drawCount: 1)                                 // unchanged: not written again
+        #expect(remembered == [3, 1])
+    }
+
+    /// Quitting or backgrounding waits until the save is on disk.
+    @Test func flushingWaitsUntilTheSaveIsOnDisk() {
+        let url = tempSaveURL()
+        let store = makeStore()
+        store.saver = GameSaver(url: url)
+        store.tapStock()
+        for _ in 0..<3 { store.tick() }                             // 3 s: not a save on its own
+        store.flushSaves()
+        #expect(GameSaver.load(from: url) == store.state, "on disk when flushSaves returns")
     }
 
     /// The store saves after a move and after undo — what a force-quit relaunch would find.

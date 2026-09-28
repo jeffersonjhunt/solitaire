@@ -12,9 +12,6 @@ struct SolitaireApp: App {
                     store.isActive = phase == .active
                     if phase != .active { store.saveNow() }          // leaving the foreground
                 }
-                .onChange(of: store.preferredDrawCount) { _, count in
-                    AppSettings.defaults.set(count, forKey: AppSettings.drawCountKey)   // remembered for the next deal
-                }
                 #if os(macOS)
                 .frame(minWidth: 600, minHeight: 420)
                 #endif
@@ -36,27 +33,47 @@ struct SolitaireApp: App {
     /// Resume the saved game if the player wants that and it is valid; otherwise deal fresh in the
     /// remembered draw mode. Undo always starts empty.
     private static func makeStore() -> GameStore {
+        SaveLocation.resetForTests()
         let url = SaveLocation.url()
+        let saver = url.map(GameSaver.init)
+        let store: GameStore
         #if DEBUG
-        if let store = UITestScenario.storeFromEnvironment() {
-            store.saver = url.map(GameSaver.init)
-            return store
+        if let scenario = UITestScenario.storeFromEnvironment() {
+            scenario.saver = saver
+            store = scenario
+        } else {
+            store = launchFromSave(url: url, saver: saver)
         }
+        #else
+        store = launchFromSave(url: url, saver: saver)
         #endif
+        store.rememberDrawCount = { AppSettings.defaults.set($0, forKey: AppSettings.drawCountKey) }
+        saveBeforeTheProcessMayEnd(store)
+        return store
+    }
+
+    private static func launchFromSave(url: URL?, saver: GameSaver?) -> GameStore {
         let defaults = AppSettings.defaults
         let drawCount = defaults.object(forKey: AppSettings.drawCountKey) as? Int ?? 1
         let resume = defaults.object(forKey: AppSettings.resumeKey) as? Bool ?? true
-        let store: GameStore
-        switch LaunchPlan.decide(saved: url.flatMap(GameSaver.load(from:)), resumePreferred: resume,
-                                 drawCount: drawCount) {
-        case .resume(let saved):
-            store = GameStore(drawCount: drawCount)
-            store.resume(from: saved)
-        case .deal(let count):
-            store = GameStore(drawCount: count)
+        let plan = LaunchPlan.decide(saved: url.flatMap(GameSaver.load(from:)), resumePreferred: resume,
+                                     drawCount: drawCount)
+        return GameStore.launch(plan, drawCount: drawCount, saver: saver)
+    }
+
+    /// Quitting on the Mac and backgrounding on iOS may end the process moments later, so wait for
+    /// the save to reach disk there — not just start it. (A force quit gives the app no chance at
+    /// all; then the last save stands: after every change and every fifth second.) Observers, not
+    /// view modifiers, so this works with no window open.
+    private static func saveBeforeTheProcessMayEnd(_ store: GameStore) {
+        #if os(macOS)
+        let name = NSApplication.willTerminateNotification
+        #else
+        let name = UIApplication.didEnterBackgroundNotification
+        #endif
+        _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { store.flushSaves() }
         }
-        store.saver = url.map(GameSaver.init)
-        return store
     }
 }
 

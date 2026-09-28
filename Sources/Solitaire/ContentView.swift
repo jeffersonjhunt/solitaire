@@ -27,8 +27,9 @@ struct ContentView: View {
         }
         #endif
         .sheet(isPresented: winSheetShown) {
-            WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed) {
-                store.newGame()
+            WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed,
+                     preferredDrawCount: store.preferredDrawCount) { count in
+                store.newGame(drawCount: count)
             }
         }
     }
@@ -57,10 +58,13 @@ struct TableBackground: View {
     }
 }
 
+/// The win sheet: move count and time, and a new game — asking for the draw count like every other
+/// way of starting one (the remembered mode is the default button).
 struct WinSheet: View {
     let moves: Int
     let elapsed: TimeInterval
-    let newGame: () -> Void
+    let preferredDrawCount: Int
+    let newGame: (Int) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -74,9 +78,14 @@ struct WinSheet: View {
             .font(.title3.monospacedDigit())
             HStack {
                 Button("Close") { dismiss() }
-                Button("New Game") { newGame() }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
+                ForEach([1, 3], id: \.self) { count in
+                    let button = Button("New Game: Draw \(count)") { newGame(count) }
+                    if count == preferredDrawCount {
+                        button.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    } else {
+                        button.buttonStyle(.bordered)
+                    }
+                }
             }
         }
         .padding(32)

@@ -7,15 +7,18 @@ final class SolitaireUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// This test's own save file and settings, so no UI test reads or overwrites the player's
-    /// real game or preferences (on the Mac they share the real app's container).
-    private lazy var isolation = "uitest-\(UUID().uuidString)"
+    /// The UI tests' own save file and settings suite: no UI test reads or overwrites the player's
+    /// real game or preferences (on the Mac they share the real app's container). One fixed name,
+    /// reset at the start of each test, so runs never leave files piling up.
+    private let isolation = "uitest"
 
-    /// Launches the app with a Debug scenario or seed, passed in the environment (see UITestScenario).
-    private func launch(scenario: String? = nil, seed: UInt64? = nil) -> XCUIApplication {
+    /// Launches the app with a Debug scenario or seed, passed in the environment (see
+    /// UITestScenario). `reset: false` keeps the previous launch's save — for relaunch tests.
+    private func launch(scenario: String? = nil, seed: UInt64? = nil, reset: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["SOLITAIRE_SAVE_FILE"] = isolation
         app.launchEnvironment["SOLITAIRE_DEFAULTS_SUITE"] = isolation
+        if reset { app.launchEnvironment["SOLITAIRE_RESET"] = "1" }
         // Ignore saved window state, as Xcode does for the unit-test host. A run that quit with no
         // window open saves "no windows", and XCUITest's launch (unlike Finder or the Dock) does not
         // send the "open application" event that would open one anyway — the app came up windowless.
@@ -34,7 +37,8 @@ final class SolitaireUITests: XCTestCase {
         autoFinish.press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["12 moves"].exists, "twelve auto-finish moves")
-        XCTAssertTrue(app.buttons["New Game"].exists)
+        // A new game from the win sheet asks for the draw count, like every other way to start one.
+        XCTAssertTrue(app.buttons["New Game: Draw 1"].exists && app.buttons["New Game: Draw 3"].exists)
     }
 
     /// Acceptance 6: a king alone at the bottom of a column reaches an empty column by drag, but a
@@ -106,14 +110,48 @@ final class SolitaireUITests: XCTestCase {
         let before = try seconds(app)
         XCTAssertGreaterThanOrEqual(before, 5)
 
-        app.terminate()                                   // force quit
-        app = launch()                                    // same save file, no seed: resume
+        app.terminate()                                   // force quit: no chance to save
+        app = launch(reset: false)                        // same save file, no seed: resume
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 22 cards"].waitForExistence(timeout: 5))
         XCTAssertTrue(text(app, equalTo: "2 moves").exists, "move count restored")
         XCTAssertEqual(wasteTop(app), waste, "same board")
-        XCTAssertGreaterThanOrEqual(try seconds(app), 5, "elapsed time restored")
+        // Restored to the last save — at most five seconds back (decision). The clock runs again
+        // once relaunched, so allow for the relaunch itself (slower on iOS) above.
+        let after = try seconds(app)
+        XCTAssertTrue((before - 5)...(before + Self.relaunchSlack) ~= after,
+                      "elapsed \(after) s after quitting at \(before) s")
         XCTAssertFalse(app.buttons["Undo"].isEnabled, "a resumed game starts with undo empty")
     }
+
+    /// Quitting normally (⌘Q on the Mac; iOS sending the app to the background) saves on the spot,
+    /// so the elapsed time comes back exactly — not rounded down to the last five-second save.
+    func testQuittingNormallyKeepsTheExactTime() throws {
+        var app = launch(seed: 4)
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        stock.press()
+        sleep(8)                                          // between five-second saves (7-8 s)
+        let before = try seconds(app)
+        XCTAssertTrue(before % 5 != 0, "not on a save boundary (\(before) s), or the test proves nothing")
+        #if os(macOS)
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+        #else
+        XCUIDevice.shared.press(.home)                    // background: the app saves on the spot
+        sleep(2)
+        app.terminate()
+        #endif
+        app = launch(reset: false)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5))
+        // Never less than when it quit (a rounded-down five-second save would be), plus the
+        // seconds the clock runs until the quit and again after the relaunch.
+        let after = try seconds(app)
+        XCTAssertTrue(before...(before + Self.relaunchSlack) ~= after,
+                      "elapsed \(after) s after quitting at \(before) s")
+    }
+
+    /// Seconds the clock keeps running around a quit and relaunch (quit ~1 s, iOS relaunch ~3 s).
+    private static let relaunchSlack = 6
 
     /// Starting a new game asks for the draw count — a sheet on iPhone, the File menu pair on the
     /// Mac — and deals in that mode.

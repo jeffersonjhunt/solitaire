@@ -17,23 +17,47 @@ actor GameSaver {
         guard sequence > lastWritten else { return }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
-        let data = try JSONEncoder().encode(state)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(SaveFile(game: state, savedAt: Date()))
         try data.write(to: url, options: .atomic)
         lastWritten = sequence
     }
 
-    /// The saved game, if there is one that decodes and passes `SaveValidation`; nil otherwise.
+    /// The saved game, if there is one that decodes, has a known format version and passes
+    /// `SaveValidation`; nil otherwise.
     nonisolated static func load(from url: URL) -> GameState? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
         guard let data = try? Data(contentsOf: url),
-              let state = try? JSONDecoder().decode(GameState.self, from: data),
-              SaveValidation.isResumable(state) else { return nil }
-        return state
+              let file = try? decoder.decode(SaveFile.self, from: data),
+              file.version == SaveFile.currentVersion,
+              SaveValidation.isResumable(file.game) else { return nil }
+        return file.game
+    }
+}
+
+/// The file format: the game inside a small envelope, so the format can evolve (`version`) and two
+/// copies can be ordered (`savedAt`) — what an iCloud sync would need later (spec: the save format
+/// must not block it).
+struct SaveFile: Codable, Equatable {
+    static let currentVersion = 1
+    var version = SaveFile.currentVersion
+    var savedAt: Date
+    var game: GameState
+
+    init(game: GameState, savedAt: Date) {
+        self.game = game
+        self.savedAt = savedAt
     }
 }
 
 /// Whether a decoded save is a game we can resume: 52 distinct real cards in 4 foundations and 7
-/// columns, a valid draw mode, sane counters, and not already won (spec + decision F6). Anything
-/// else is discarded silently and a fresh game dealt.
+/// columns, a valid draw mode, sane counters, not already won (spec + decision F6) — and piles
+/// shaped the way play leaves them, so a damaged file can never restore a stuck game: stock face
+/// down, waste face up, each foundation one suit ascending from the ace, each column face-down
+/// cards under a face-up built run with a face-up last card. Anything else is discarded silently
+/// and a fresh game dealt.
 enum SaveValidation {
     static func isResumable(_ s: GameState) -> Bool {
         guard s.foundations.count == 4, s.tableau.count == 7,
@@ -41,8 +65,24 @@ enum SaveValidation {
               !s.isWon, !SolitaireEngine.isWon(s),
               s.moveCount >= 0, s.elapsed >= 0, s.elapsed.isFinite else { return false }
         let cards = s.stock + s.waste + s.foundations.flatMap { $0 } + s.tableau.flatMap { $0 }
-        guard cards.count == 52, cards.allSatisfy({ (1...13).contains($0.rank) }) else { return false }
-        return Set(cards.map(\.id)).count == 52
+        guard cards.count == 52, cards.allSatisfy({ (1...13).contains($0.rank) }),
+              Set(cards.map(\.id)).count == 52 else { return false }
+        guard s.stock.allSatisfy({ !$0.isFaceUp }), s.waste.allSatisfy(\.isFaceUp) else { return false }
+        for f in s.foundations {
+            for (i, card) in f.enumerated() where !card.isFaceUp || card.rank != i + 1 || card.suit != f[0].suit {
+                return false
+            }
+        }
+        for column in s.tableau where !column.isEmpty {
+            guard let firstUp = column.firstIndex(where: \.isFaceUp),
+                  column[firstUp...].allSatisfy(\.isFaceUp) else { return false }   // last card face up
+            let run = column[firstUp...]
+            for (lower, upper) in zip(run, run.dropFirst())
+            where upper.rank != lower.rank - 1 || upper.suit.isRed == lower.suit.isRed {
+                return false
+            }
+        }
+        return true
     }
 }
 
@@ -63,6 +103,19 @@ enum LaunchPlan: Equatable {
 /// shares the real app's sandbox container, so it would otherwise read and overwrite the player's
 /// real game.
 enum SaveLocation {
+    /// Debug builds only: forget a UI test's own save and settings before it starts
+    /// (SOLITAIRE_RESET=1), so repeated test runs reuse one file instead of piling up new ones.
+    static func resetForTests(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        #if DEBUG
+        guard environment["SOLITAIRE_RESET"] == "1", let url = url(environment: environment),
+              url.lastPathComponent != "game.json" else { return }       // never the player's game
+        try? FileManager.default.removeItem(at: url)
+        if let suite = environment["SOLITAIRE_DEFAULTS_SUITE"] {
+            UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
+        }
+        #endif
+    }
+
     static func url(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
         #if DEBUG
         if environment["XCTestConfigurationFilePath"] != nil { return nil }        // unit-test host
