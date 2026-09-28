@@ -4,6 +4,7 @@ import SwiftUI
 /// bottom within thumb reach on iPhone, at the top on iPad and Mac (see `ContentView`).
 struct GameBar: View {
     let store: GameStore
+    let ui: AppUI
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     private var isCompact: Bool { sizeClass == .compact }
@@ -45,15 +46,23 @@ struct GameBar: View {
     private var newGameControl: some View {
         #if os(iOS)
         let button = Button("New Game", systemImage: "plus.rectangle.on.rectangle") { choosingNewGame = true }
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            button.sheet(isPresented: $choosingNewGame) {
-                NewGameChooser(store: store) { choosingNewGame = false }
-                    .presentationDetents([.height(300)])
+        Group {
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                button.sheet(isPresented: $choosingNewGame) {
+                    NewGameChooser(store: store, ui: ui) { choosingNewGame = false }
+                        .presentationDetents([.height(340)])
+                }
+            } else {
+                button.popover(isPresented: $choosingNewGame) {
+                    NewGameChooser(store: store, ui: ui) { choosingNewGame = false }
+                        .frame(width: 320)
+                }
             }
-        } else {
-            button.popover(isPresented: $choosingNewGame) {
-                NewGameChooser(store: store) { choosingNewGame = false }
-                    .frame(width: 320)
+        }
+        .onChange(of: choosingNewGame) { _, open in
+            if !open, ui.helpAfterChooser {                    // the chooser asked for help
+                ui.helpAfterChooser = false
+                ui.showingHelp = true
             }
         }
         #else
@@ -95,6 +104,7 @@ private struct AdaptiveLabelStyle: LabelStyle {
 /// marked, plus the resume-at-launch setting.
 struct NewGameChooser: View {
     let store: GameStore
+    let ui: AppUI
     let done: () -> Void
     @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
 
@@ -107,7 +117,14 @@ struct NewGameChooser: View {
             }
             Toggle("Resume at launch", isOn: $resumeOnLaunch)
                 .font(.subheadline)
-            Button("Cancel", role: .cancel, action: done)
+            HStack {
+                Button("How to Play", systemImage: "questionmark.circle") {
+                    ui.helpAfterChooser = true
+                    done()
+                }
+                Spacer()
+                Button("Cancel", role: .cancel, action: done)
+            }
         }
         .padding(24)
     }

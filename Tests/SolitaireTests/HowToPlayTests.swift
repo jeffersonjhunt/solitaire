@@ -1,0 +1,33 @@
+import Testing
+@testable import Solitaire
+
+@Suite struct Help {
+    var text: String {
+        HowToPlay.sections.map { ([$0.title] + $0.lines).joined(separator: "\n") }.joined(separator: "\n")
+    }
+
+    /// The help explains the whole game: the goal, the deal, every move the rules allow, the
+    /// stock and both draw modes, winning and auto-finish, and saving.
+    @Test func coversTheRules() {
+        let titles = HowToPlay.sections.map(\.title)
+        #expect(titles == ["Goal", "The deal", "Moves", "The stock", "Controls", "Winning", "Saving"])
+        for phrase in ["ace up to king", "opposite colour", "Empty column:** only a king",
+                       "Back from a foundation", "turns over by itself", "Draw 3", "turn the waste back over",
+                       "Auto-finish", "no losing", "resumes at the next launch"] {
+            #expect(text.contains(phrase), "missing: \(phrase)")
+        }
+    }
+
+    /// …and this platform's controls, not the other's.
+    @Test func describesThisPlatformsControls() {
+        let controls = HowToPlay.sections.first { $0.title == "Controls" }!.lines.joined(separator: "\n")
+        #if os(macOS)
+        #expect(controls.contains("**Click**") && controls.contains("**Space**") && controls.contains("Settings (⌘,)"))
+        #expect(!controls.contains("**Tap**"))
+        #else
+        #expect(controls.contains("**Tap**") && controls.contains("Draw 1 or Draw 3"))
+        #expect(!controls.contains("**Click**"))
+        #endif
+        #expect(controls.contains("wiggles") && controls.contains("foundation does nothing"))
+    }
+}
