@@ -19,14 +19,20 @@ final class GameStore {
                 // moves nothing and leaves the drag alone.
                 pendingDrag = nil
             }
+            if Self.shouldSave(from: oldValue, to: state) { scheduleSave() }
         }
     }
     /// The cards the latest change moved between piles (a move, draw, redeal, undo or deal). The
     /// board raises them above everything while they animate, so they never slide under a deeper
     /// column; the clock ticking does not reset it.
     private(set) var movedCardIDs: Set<Int> = []
-    /// The draw mode the next deal uses (toggled from the Game menu; persisted in U5).
-    var preferredDrawCount: Int
+    /// The draw mode the next deal uses (toggled from the Game menu). Every change is remembered
+    /// straight away, whether or not a game window is open.
+    var preferredDrawCount: Int {
+        didSet { if preferredDrawCount != oldValue { rememberDrawCount?(preferredDrawCount) } }
+    }
+    /// Stores the draw-count setting (UserDefaults in the app; nil in tests).
+    @ObservationIgnored var rememberDrawCount: ((Int) -> Void)?
     /// The card being dragged (with its run), from `beginDrag` until `drop` or `cancelDrag`.
     private(set) var pendingDrag: PendingDrag?
     /// The latest thing worth a haptic (iOS): a move, a draw, a win. Nothing on failure.
@@ -48,6 +54,11 @@ final class GameStore {
         didSet { updateClock() }
     }
 
+    /// Where the game is saved; nil (tests, the unit-test host) means no persistence.
+    @ObservationIgnored var saver: GameSaver?
+    @ObservationIgnored private var saveSequence = 0
+    /// The latest save in flight; each waits for the one before it.
+    @ObservationIgnored private(set) var lastSave: Task<Void, Never>?
     @ObservationIgnored private let makeSeed: () -> UInt64
     @ObservationIgnored private var clock: Task<Void, Never>?
     @ObservationIgnored private var finishing: Task<Void, Never>?
@@ -209,7 +220,66 @@ final class GameStore {
         finishing = nil
     }
 
-    static func movedCards(from old: GameState, to new: GameState) -> Set<Int> {
+    // MARK: Saving
+
+    /// Save after every applied change — a move, draw, redeal, undo, deal or resume — and, while
+    /// only the clock runs, on every fifth second (spec).
+    nonisolated static func shouldSave(from old: GameState, to new: GameState) -> Bool {
+        var oldIgnoringClock = old
+        oldIgnoringClock.elapsed = new.elapsed
+        if oldIgnoringClock != new { return true }
+        return old.elapsed != new.elapsed && Int(new.elapsed) % 5 == 0
+    }
+
+    /// Save now, whatever changed.
+    func saveNow() {
+        scheduleSave()
+    }
+
+    /// Save now and wait (up to `timeout`) until it is on disk — for moments the process may end
+    /// right after: quitting on the Mac, going to the background on iOS. Safe to block the main
+    /// thread: save tasks run off the main actor.
+    func flushSaves(timeout: TimeInterval = 2) {
+        guard saver != nil else { return }
+        scheduleSave()
+        let pending = lastSave
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            await pending?.value
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + timeout)
+    }
+
+    private func scheduleSave() {
+        guard let saver else { return }
+        saveSequence += 1
+        let (snapshot, sequence, previous) = (state, saveSequence, lastSave)
+        // Detached: the write never needs the main actor, so `flushSaves` can wait on it.
+        lastSave = Task.detached {
+            await previous?.value
+            try? await saver.save(snapshot, sequence: sequence)
+        }
+    }
+
+    /// The store the app starts with: the saved game resumed, or a fresh deal — which is saved at
+    /// once, so an older save left on disk can never come back later.
+    static func launch(_ plan: LaunchPlan, drawCount: Int, saver: GameSaver?) -> GameStore {
+        let store: GameStore
+        switch plan {
+        case .resume(let saved):
+            store = GameStore(drawCount: drawCount)
+            store.resume(from: saved)
+            store.saver = saver
+        case .deal(let count):
+            store = GameStore(drawCount: count)
+            store.saver = saver
+            store.saveNow()
+        }
+        return store
+    }
+
+    nonisolated static func movedCards(from old: GameState, to new: GameState) -> Set<Int> {
         func piles(_ s: GameState) -> [Int: PileID] {
             var out: [Int: PileID] = [:]
             for c in s.stock { out[c.id] = .stock }
@@ -222,7 +292,7 @@ final class GameStore {
         return Set(piles(new).compactMap { id, pile in before[id] == pile ? nil : id })
     }
 
-    static func validDrawCount(_ drawCount: Int) -> Int {
+    nonisolated static func validDrawCount(_ drawCount: Int) -> Int {
         drawCount == 3 ? 3 : 1
     }
 }
