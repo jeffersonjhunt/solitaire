@@ -120,7 +120,7 @@ the `get-task-allow` entitlement (see the spec's decisions).
 **Profiling.** `make profile` installs the Debug build on your device, launches it on a Debug-only
 position — a 13-card King→Ace run next to an empty column, with its own save file and settings so
 it never touches your game — and records **Animation Hitches** for 30 seconds (`TIME=60s` for
-longer) while you drag the run back and forth. The trace opens in Instruments when it ends.
+longer) while you drag the run back and forth. The trace opens in Instruments when it ends (`OPEN=no` just saves it in `build/traces/`).
 `make profile-mac` does the same on the Mac. Hitches are only measured on real hardware, not the
 simulator. The Debug build is slower than Release, so a clean trace holds for both.
 

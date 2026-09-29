@@ -45,6 +45,9 @@ PROFILE_ENV_JSON := {"SOLITAIRE_SCENARIO":"kingToAce","SOLITAIRE_SAVE_FILE":"pro
 TEMPLATE ?= Animation Hitches
 TIME     ?= 30s
 TRACES   := build/traces
+# OPEN=no records and saves the trace without opening Instruments — for unattended runs, which
+# would otherwise leave Instruments (and its save prompt on quit) on the Mac's screen.
+OPEN     ?= yes
 
 .PHONY: help xcodegen generate build run logs stop test uitest devices device install profile \
         profile-mac need-device clean
@@ -113,7 +116,8 @@ profile: install ## Record Animation Hitches on DEVICE from the King→Ace posit
 	@echo ">> recording $(TIME) on $(DEVICE) — drag the King→Ace run back and forth"
 	xcrun xctrace record --template "$(TEMPLATE)" --device "$(DEVICE)" --time-limit $(TIME) \
 	  --output "$(TRACES)/device-$$(date +%Y%m%d-%H%M%S).trace" --attach Solitaire
-	@open "$$(ls -td $(TRACES)/*.trace | head -1)"
+	@trace="$$(ls -td $(TRACES)/*.trace | head -1)"; \
+	if [ "$(OPEN)" = no ]; then echo ">> saved: $$trace"; else open "$$trace"; fi
 
 profile-mac: build ## The same recording on this Mac (a separate copy; your game is untouched)
 	@test "$(CONFIG)" = Debug || { echo "profiling needs CONFIG=Debug: the King→Ace position is Debug-only"; exit 1; }
@@ -123,7 +127,8 @@ profile-mac: build ## The same recording on this Mac (a separate copy; your game
 	@echo ">> recording $(TIME) — drag the King→Ace run back and forth"
 	xcrun xctrace record --template "$(TEMPLATE)" --time-limit $(TIME) \
 	  --output "$(TRACES)/mac-$$(date +%Y%m%d-%H%M%S).trace" --attach $$($(MAC_PID))
-	@open "$$(ls -td $(TRACES)/*.trace | head -1)"
+	@trace="$$(ls -td $(TRACES)/*.trace | head -1)"; \
+	if [ "$(OPEN)" = no ]; then echo ">> saved: $$trace"; else open "$$trace"; fi
 
 need-device:
 	@test -n "$(DEVICE)" || { echo "Which device? echo '<name or UDID>' > .device, or DEVICE=… (see make devices)"; exit 1; }
