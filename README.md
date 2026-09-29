@@ -78,35 +78,59 @@ The Xcode project is **generated** from `project.yml` by [XcodeGen](https://gith
 and is not committed. Change project settings in `project.yml`, never in Xcode's project editor —
 the next generation would overwrite them.
 
-**With Xcode:** generate the project, open it and run:
+**On the Mac, with `make`** (no Xcode IDE needed; `make help` lists every target):
 
 ```bash
-xcodegen generate            # XcodeGen 2.45.4, the version in .xcodegen-version
-open Solitaire.xcodeproj     # choose "My Mac", an iPhone or an iPad simulator, then ⌘R
+make run              # generate the project, build the Mac app, launch it and stream its logs
+make test             # engine tests + the app's unit tests
+make uitest           # UI tests — leave the Mac alone while they run
+make install          # build for your iPhone or iPad and install it (needs .devteam and .device)
+make clean
 ```
 
+The first `make` builds the XcodeGen pinned in `.xcodegen-version` (about a minute, once) into
+`~/Library/Caches/apple-xcodebuild/`, the cache the skill below uses too. A tag that has moved off
+the pinned commit is refused, never built.
+
 **From a Linux container** (how this app was built), with the `apple-xcodebuild` skill driving a
-Mac over SSH — it builds the pinned XcodeGen itself:
+Mac over SSH:
 
 ```bash
 X=~/.claude/skills/apple-xcodebuild/scripts
 python3 $X/xc-doctor.py                         # is the Mac ready?
-python3 $X/xc-build.py                          # iOS Simulator + macOS
+python3 $X/xc-build.py --adhoc                  # iOS Simulator + macOS
 python3 $X/xc-run.py --platform macos           # or --platform ios-sim --device "iPhone 18 Pro"
 python3 $X/xc-shot.py --platform macos          # a screenshot of the running app
 ```
 
-Signing: builds are ad-hoc signed, which is enough for the simulator and your own Mac. A physical
-iPhone or iPad needs your Apple team ID (`.devteam`, or `--team`). Distributed builds must not
-carry the `get-task-allow` entitlement (see the spec's decisions).
+**Signing.** Signing settings are per developer, so they live in gitignored files:
+
+```bash
+echo XXXXXXXXXX > .devteam          # your Apple team ID: automatic signing (needed for a device)
+echo 'My iPhone' > .device          # the device to install on and profile (see make devices)
+```
+
+`make` signs the Mac app with `.signid` (a named identity) if present, else your team, else ad-hoc;
+device builds always use the team. The first device build registers the device and creates its
+provisioning profile, which needs your Apple ID signed in to Xcode (Settings ▸ Accounts). Over SSH
+neither your signing keys nor that account are usable, so the skill builds the Mac app with
+`--adhoc` there, and device builds happen with `make` at the Mac. Distributed builds must not carry
+the `get-task-allow` entitlement (see the spec's decisions).
+
+**Profiling.** `make profile` installs the Debug build on your device, launches it on a Debug-only
+position — a 13-card King→Ace run next to an empty column, with its own save file and settings so
+it never touches your game — and records **Animation Hitches** for 30 seconds (`TIME=60s` for
+longer) while you drag the run back and forth. The trace opens in Instruments when it ends.
+`make profile-mac` does the same on the Mac. Hitches are only measured on real hardware, not the
+simulator. The Debug build is slower than Release, so a clean trace holds for both.
 
 ## Testing
 
 | Suite | What it covers | Run it |
 |---|---|---|
 | Engine (`Packages/SolitaireEngine`) | every rule, the seeded deal, draw/redeal, tap-to-move, auto-finish, a full winning game | `swift test` in the package — on macOS or Linux (`docker run --rm -v "$PWD":/pkg -w /pkg swift:6.1 swift test --scratch-path /tmp/build`) |
-| App unit tests | the store (undo, clock, drag), layout at the spec's sizes, VoiceOver roles, saving and resuming | `xc-test.py --platform macos` / `--platform ios-sim`, or ⌘U in Xcode |
-| UI tests | the running app: winning and the win sheet, drag vs tap, draw/undo, menus, the draw-count choice, force-quit and relaunch, exact time after quitting | the same commands |
+| App unit tests | the store (undo, clock, drag), layout at the spec's sizes, VoiceOver roles, saving and resuming | `make test`, or `xc-test.py --platform macos` / `--platform ios-sim` |
+| UI tests | the running app: winning and the win sheet, drag vs tap, draw/undo, menus, the draw-count choice, force-quit and relaunch, exact time after quitting | `make uitest`, or the same `xc-test.py` commands |
 
 Every behaviour has a test that was shown to fail with that behaviour broken.
 
@@ -121,6 +145,8 @@ tests never touch your real game or settings; they use their own save file and s
 ```
 spec.md                          the specification, with a Decisions table that overrides it
 project.yml                      XcodeGen spec (the .xcodeproj is generated)
+Makefile                         build, run, test, install and profile on the Mac
+tools/xcodegen                   runs the pinned XcodeGen, building it once
 Packages/SolitaireEngine/        the rules: pure Swift, no UI, tested on macOS and Linux
 Sources/Solitaire/
   GameStore.swift                the only thing that changes the game: intents, undo, clock, saving
@@ -129,7 +155,7 @@ Sources/Solitaire/
   ContentView.swift, GameBar.swift   window, toolbar, win sheet, new-game chooser
   HowToPlayView.swift            the in-app help
   Board/                         layout metrics, card drawing, drag and tap, win cascade
-  UITestScenario.swift           Debug-only positions for UI tests
+  UITestScenario.swift           Debug-only positions for UI tests and profiling
 Tests/SolitaireTests/            unit tests (Swift Testing)
 Tests/SolitaireUITests/          UI tests (XCUITest)
 ```
