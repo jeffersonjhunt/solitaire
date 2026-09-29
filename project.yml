@@ -1,6 +1,6 @@
 # XcodeGen spec — the source of truth. The .xcodeproj is generated from it (and gitignored):
-# the apple-xcodebuild skill's xc-build.py regenerates it before every build, using the XcodeGen
-# version pinned in .xcodegen-version (built once into a cache on the Mac).
+# `make` on the Mac and the apple-xcodebuild skill's xc-build.py both regenerate it before every
+# build, using the XcodeGen pinned in .xcodegen-version (built once into a shared cache on the Mac).
 name: Solitaire
 options:
   bundleIdPrefix: com.oneoffendeavors

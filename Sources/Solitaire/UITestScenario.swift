@@ -24,6 +24,9 @@ enum UITestScenario {
     ///   in four columns; stock and waste empty — Auto-finish is offered and wins.
     /// - `kingAlone`: a real deal, rearranged so column 1 holds only the K♥ and column 2 is empty —
     ///   the king can reach the empty column by drag but tapping it must do nothing.
+    /// - `kingToAce`: column 1 holds a face-up run from K♠ down to A♠ (spades and hearts
+    ///   alternating) and column 2 is empty, so the whole 13-card run can be dragged back and forth —
+    ///   the drag Instruments measures (`make profile` launches this position).
     static func state(named name: String) -> GameState? {
         switch name {
         case "almostWon":
@@ -48,6 +51,26 @@ enum UITestScenario {
             s.tableau[1] = []
             // Keep every column's last card face up after removing the king from it.
             for t in 2..<7 where !s.tableau[t].isEmpty { s.tableau[t][s.tableau[t].count - 1].isFaceUp = true }
+            return s
+        case "kingToAce":
+            let run = (1...13).reversed().map { rank in
+                Card(suit: rank % 2 == 1 ? .spades : .hearts, rank: rank, isFaceUp: true)
+            }
+            let runIDs = Set(run.map(\.id))
+            var s = SolitaireEngine.newGame(drawCount: 1, seed: 4)
+            var rest = (s.stock + s.tableau.flatMap { $0 })
+                .filter { !runIDs.contains($0.id) }
+                .map { var c = $0; c.isFaceUp = false; return c }
+            s.tableau[0] = run
+            s.tableau[1] = []
+            // Columns 3–7 get 2–6 cards with the last face up, as in a deal; the rest is the stock.
+            for t in 2..<7 {
+                s.tableau[t] = Array(rest.prefix(t))
+                rest.removeFirst(t)
+                s.tableau[t][t - 1].isFaceUp = true
+            }
+            s.stock = rest
+            s.waste = []
             return s
         default:
             return nil

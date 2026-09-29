@@ -63,6 +63,17 @@ final class SolitaireUITests: XCTestCase {
                       "the drag should have moved it")
     }
 
+    /// The profiling position works in the app: the whole King→Ace run drags to the empty column.
+    func testKingToAceRunDragsWhole() {
+        let app = launch(scenario: "kingToAce")
+        let king = app.descendants(matching: .any)["King of Spades, column 1"]
+        XCTAssertTrue(king.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["Ace of Spades, column 1"].exists)
+        king.drag(to: app.descendants(matching: .any)["Column 2, empty"], grabAt: 0.08)   // its visible strip
+        XCTAssertTrue(app.descendants(matching: .any)["King of Spades, column 2"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["Ace of Spades, column 2"].exists, "the run moved whole")
+    }
+
     /// Repeated clicks on the stock each draw in the running app. (XCUITest spaces clicks ~0.55 s
     /// apart — just over the macOS double-click interval — so the "however fast" half of the rule
     /// is covered by the `Routing` unit tests, not here.)
@@ -244,11 +255,15 @@ extension XCUIElement {
         #endif
     }
 
-    func drag(to target: XCUIElement) {
+    /// Drags from `grabAt` (a fraction of the height from the top) to the target's centre. A card
+    /// under others in a fan shows only its top strip; grabbing its centre picks up a card below.
+    func drag(to target: XCUIElement, grabAt y: CGFloat = 0.5) {
+        let from = coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y))
+        let to = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         #if os(macOS)
-        click(forDuration: 0.2, thenDragTo: target)
+        from.click(forDuration: 0.2, thenDragTo: to)
         #else
-        press(forDuration: 0.2, thenDragTo: target)
+        from.press(forDuration: 0.2, thenDragTo: to)
         #endif
     }
 }

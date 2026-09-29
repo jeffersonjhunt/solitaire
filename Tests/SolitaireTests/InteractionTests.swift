@@ -168,7 +168,7 @@ import SolitaireEngine
 }
 
 @Suite struct Scenarios {
-    @Test(arguments: ["almostWon", "kingAlone"])
+    @Test(arguments: ["almostWon", "kingAlone", "kingToAce"])
     func scenariosAreRealPositions(_ name: String) throws {
         let s = try #require(UITestScenario.state(named: name))
         let cards = s.stock + s.waste + s.foundations.flatMap { $0 } + s.tableau.flatMap { $0 }
@@ -183,5 +183,17 @@ import SolitaireEngine
         #expect(king.tableau[0] == [Card(suit: .hearts, rank: 13, isFaceUp: true)] && king.tableau[1].isEmpty)
         #expect(SolitaireEngine.autoDestination(for: .tableau(0), index: 0, in: king) == nil)
         #expect(SolitaireEngine.canMove(Move(source: .tableau(0), index: 0, destination: .tableau(1)), in: king))
+    }
+
+    /// The profiling position: a whole King→Ace run that can be picked up and moved as one.
+    @Test func kingToAceIsAThirteenCardRunThatMovesWhole() throws {
+        let s = try #require(UITestScenario.state(named: "kingToAce"))
+        let run = s.tableau[0]
+        #expect(run.map(\.rank) == Array((1...13).reversed()) && run.allSatisfy(\.isFaceUp))
+        #expect(zip(run, run.dropFirst()).allSatisfy { $0.suit.isRed != $1.suit.isRed })
+        #expect(s.tableau[1].isEmpty)
+        #expect(SaveValidation.isResumable(s), "a position a real game could reach")
+        #expect(SolitaireEngine.canPickUp(from: .tableau(0), index: 0, in: s))
+        #expect(SolitaireEngine.canMove(Move(source: .tableau(0), index: 0, destination: .tableau(1)), in: s))
     }
 }
