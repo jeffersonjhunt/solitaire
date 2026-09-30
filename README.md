@@ -111,10 +111,24 @@ echo 'My iPhone' > .device          # the device to install on and profile (see 
 ```
 
 `make` signs the Mac app with `.signid` (a named identity) if present, else your team, else ad-hoc;
-device builds always use the team. The first device build registers the device and creates its
-provisioning profile, which needs your Apple ID signed in to Xcode (Settings ▸ Accounts). Over SSH
-neither your signing keys nor that account are usable, so the skill builds the Mac app with
-`--adhoc` there, and device builds happen with `make` at the Mac. Distributed builds must not carry
+device builds always use the team. `make install` builds for the named device, so the first time
+it registers that device with your team and creates its provisioning profile.
+
+At the Mac, that uses your login keychain and the Apple ID signed in to Xcode (Settings ▸
+Accounts). **Over SSH** neither is usable, so on a build Mac `make` reads a per-machine
+`$HOME/.config/appstoreconnect/api.env` (override with `ASC_ENV=`) and then unlocks a dedicated
+signing keychain and provisions with an App Store Connect API key instead:
+
+```make
+ASC_KEY_ID=XXXXXXXXXX                          # App Store Connect ▸ Users and Access ▸ Integrations
+ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ASC_KEY_PATH=/Users/me/.config/appstoreconnect/AuthKey_XXXXXXXXXX.p8
+SIGNING_KEYCHAIN=/Users/me/Library/Keychains/signing.keychain-db
+SIGNING_KEYCHAIN_PASS_FILE=/Users/me/.config/appstoreconnect/keychain-pass   # chmod 600
+```
+
+The signing keychain holds your Apple Development identity and Apple's WWDR G3 intermediate, with
+its key opened to `codesign` (`security set-key-partition-list`). Distributed builds must not carry
 the `get-task-allow` entitlement (see the spec's decisions).
 
 **Profiling.** `make profile` installs the Debug build on your device, launches it on a Debug-only
