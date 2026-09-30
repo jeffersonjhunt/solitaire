@@ -23,14 +23,35 @@ XCB       := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(C
 #   3. (neither)           — ad-hoc (`-`): fine for your own Mac, not for a device.
 SIGN_ID  ?= $(shell cat .signid 2>/dev/null)
 DEV_TEAM ?= $(shell cat .devteam 2>/dev/null)
+
+# Signing without a GUI session (e.g. over SSH on a build Mac). SSH cannot use the login keychain's
+# keys or the Apple ID signed in to Xcode, so when this per-machine file exists, builds unlock a
+# dedicated signing keychain and provision with an App Store Connect API key instead. It holds
+# make-syntax lines: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH, SIGNING_KEYCHAIN and
+# SIGNING_KEYCHAIN_PASS_FILE (a file holding the keychain's password). Without it, builds sign as
+# before: login keychain and the Xcode account, which works at the Mac itself.
+ASC_ENV ?= $(HOME)/.config/appstoreconnect/api.env
+-include $(ASC_ENV)
+ifneq ($(strip $(ASC_KEY_ID)),)
+  ASC_AUTH := -authenticationKeyPath "$(ASC_KEY_PATH)" -authenticationKeyID $(ASC_KEY_ID) \
+              -authenticationKeyIssuerID $(ASC_ISSUER_ID)
+endif
+ifneq ($(strip $(SIGNING_KEYCHAIN)),)
+  # The password is read by the shell at run time, so make never prints it.
+  UNLOCK := security unlock-keychain -p "$$(cat "$(SIGNING_KEYCHAIN_PASS_FILE)")" "$(SIGNING_KEYCHAIN)" &&
+  KEYCHAIN_FLAG := OTHER_CODE_SIGN_FLAGS="--keychain $(SIGNING_KEYCHAIN)"
+endif
+
 ifneq ($(strip $(SIGN_ID)),)
   MAC_SIGN := CODE_SIGN_IDENTITY="$(SIGN_ID)" CODE_SIGN_STYLE=Manual
 else ifneq ($(strip $(DEV_TEAM)),)
-  MAC_SIGN := CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) -allowProvisioningUpdates
+  MAC_SIGN := CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) $(KEYCHAIN_FLAG) \
+              -allowProvisioningUpdates $(ASC_AUTH)
 else
   MAC_SIGN := CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual
 endif
-IOS_SIGN := CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) -allowProvisioningUpdates
+IOS_SIGN := CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) $(KEYCHAIN_FLAG) \
+            -allowProvisioningUpdates -allowProvisioningDeviceRegistration $(ASC_AUTH)
 
 # The iPhone or iPad to install on and profile: its name or UDID, from the gitignored .device file
 # or DEVICE=… on the command line (`make devices` lists them).
@@ -50,7 +71,7 @@ TRACES   := build/traces
 OPEN     ?= yes
 
 .PHONY: help xcodegen generate build run logs stop test uitest devices device install profile \
-        profile-mac need-device clean
+        profile-mac need-device need-team clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) \
@@ -63,7 +84,7 @@ generate: ## Generate the .xcodeproj from project.yml
 	$(XCODEGEN) generate --quiet
 
 build: generate ## Build the Mac app (signed per .signid / .devteam, else ad-hoc)
-	$(XCB) -destination 'generic/platform=macOS' $(MAC_SIGN) build
+	$(UNLOCK) $(XCB) -destination 'generic/platform=macOS' $(MAC_SIGN) build
 	@echo ">> built: $(MAC_APP)"
 
 run: build ## Build, launch the Mac app, stream its logs (stops when you quit it)
@@ -89,20 +110,22 @@ stop: ## Quit the running Mac app
 
 test: generate ## Engine tests + the app's unit tests on the Mac
 	swift test --package-path Packages/SolitaireEngine
-	$(XCB) -destination 'platform=macOS' -only-testing:SolitaireTests $(MAC_SIGN) test
+	$(UNLOCK) $(XCB) -destination 'platform=macOS' -only-testing:SolitaireTests $(MAC_SIGN) test
 
 uitest: generate ## UI tests on the Mac — leave the Mac alone while they run
-	$(XCB) -destination 'platform=macOS' -only-testing:SolitaireUITests $(MAC_SIGN) test
+	$(UNLOCK) $(XCB) -destination 'platform=macOS' -only-testing:SolitaireUITests $(MAC_SIGN) test
 
 devices: ## List iPhones and iPads (connected devices and simulators)
 	xcrun devicectl list devices
 
-device: generate ## Build for an iPhone or iPad (needs .devteam)
-	@test -n "$(strip $(DEV_TEAM))" || { echo "A device build needs your Apple team ID: echo XXXXXXXXXX > .devteam"; exit 1; }
-	$(XCB) -destination 'generic/platform=iOS' $(IOS_SIGN) build
+device: need-team generate ## Build for any iPhone or iPad (needs .devteam and one registered device)
+	$(UNLOCK) $(XCB) -destination 'generic/platform=iOS' $(IOS_SIGN) build
 	@echo ">> built: $(IOS_APP)"
 
-install: need-device device ## Build and install on DEVICE
+# Builds for DEVICE itself, not "any iOS device": that is what lets xcodebuild register it with your
+# team, and a development profile cannot exist until the team has a device.
+install: need-device need-team generate ## Build for DEVICE (registering it if new) and install it
+	$(UNLOCK) $(XCB) -destination "platform=iOS,name=$(DEVICE)" $(IOS_SIGN) build
 	xcrun devicectl device install app --device "$(DEVICE)" "$(IOS_APP)"
 
 # Both profile targets launch the app normally, then attach the recording to it. (Launched by
@@ -129,6 +152,9 @@ profile-mac: build ## The same recording on this Mac (a separate copy; your game
 	  --output "$(TRACES)/mac-$$(date +%Y%m%d-%H%M%S).trace" --attach $$($(MAC_PID))
 	@trace="$$(ls -td $(TRACES)/*.trace | head -1)"; \
 	if [ "$(OPEN)" = no ]; then echo ">> saved: $$trace"; else open "$$trace"; fi
+
+need-team:
+	@test -n "$(strip $(DEV_TEAM))" || { echo "A device build needs your Apple team ID: echo XXXXXXXXXX > .devteam"; exit 1; }
 
 need-device:
 	@test -n "$(DEVICE)" || { echo "Which device? echo '<name or UDID>' > .device, or DEVICE=… (see make devices)"; exit 1; }
