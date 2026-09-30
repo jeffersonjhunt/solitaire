@@ -111,11 +111,42 @@ echo 'My iPhone' > .device          # the device to install on and profile (see 
 ```
 
 `make` signs the Mac app with `.signid` (a named identity) if present, else your team, else ad-hoc;
-device builds always use the team. The first device build registers the device and creates its
-provisioning profile, which needs your Apple ID signed in to Xcode (Settings ▸ Accounts). Over SSH
-neither your signing keys nor that account are usable, so the skill builds the Mac app with
-`--adhoc` there, and device builds happen with `make` at the Mac. Distributed builds must not carry
-the `get-task-allow` entitlement (see the spec's decisions).
+device builds always use the team. `make install` builds for the named device, so the first time
+it registers that device with your team and creates its provisioning profile.
+
+At the Mac, that uses your login keychain and the Apple ID signed in to Xcode (Settings ▸
+Accounts). **Over SSH** neither is usable, so on a build Mac `make` reads a per-machine
+`$HOME/.config/appstoreconnect/api.env` (override with `ASC_ENV=`) and then unlocks a dedicated
+signing keychain and provisions with an App Store Connect API key instead:
+
+```make
+ASC_KEY_ID=XXXXXXXXXX                          # App Store Connect ▸ Users and Access ▸ Integrations
+ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ASC_KEY_PATH=/Users/me/.config/appstoreconnect/AuthKey_XXXXXXXXXX.p8
+SIGNING_KEYCHAIN=/Users/me/Library/Keychains/signing.keychain-db
+SIGNING_KEYCHAIN_PASS_FILE=/Users/me/.config/appstoreconnect/keychain-pass   # chmod 600
+```
+
+The signing keychain holds your Apple Development identity and Apple's WWDR G3 intermediate, with
+its key opened to `codesign` (`security set-key-partition-list`). Distributed builds must not let a
+debugger attach (see the spec's decisions).
+
+**TestFlight.** The App Store Connect app record is **One Off Solitaire** (bundle ID
+`com.oneoffendeavors.solitaire`, iOS and macOS). With the API settings above in place:
+
+```bash
+make archive      # Release archives for iOS and the Mac; build number = UTC time (must rise per upload)
+make export       # Apple signs them for the App Store, then tools/check-release.sh checks the result
+make upload       # uploads exactly those two packages
+make testflight   # recent builds and whether Apple has finished processing them
+```
+
+The iOS archive is left unsigned and Apple signs it at export (a signed one would need a
+development profile, which needs a registered device); the Mac archive is signed with your team so
+it carries the sandbox entitlement. `check-release.sh` refuses to pass a package that is not
+signed Apple Distribution, that a debugger could attach to, or that lacks the privacy manifest.
+Testers install through the TestFlight app — no Developer Mode, no device registration. The
+privacy policy the store links to is <https://oneoffendeavors.com/solitaire/privacy/>.
 
 **Profiling.** `make profile` installs the Debug build on your device, launches it on a Debug-only
 position — a 13-card King→Ace run next to an empty column, with its own save file and settings so
@@ -147,6 +178,9 @@ spec.md                          the specification, with a Decisions table that 
 project.yml                      XcodeGen spec (the .xcodeproj is generated)
 Makefile                         build, run, test, install and profile on the Mac
 tools/xcodegen                   runs the pinned XcodeGen, building it once
+tools/make-icon.swift            draws the app icon (swift tools/make-icon.swift Resources/Assets.xcassets/AppIcon.appiconset)
+tools/check-release.sh           checks exported packages before upload
+tools/asc.py                     App Store Connect API: builds, bundle ID
 Packages/SolitaireEngine/        the rules: pure Swift, no UI, tested on macOS and Linux
 Sources/Solitaire/
   GameStore.swift                the only thing that changes the game: intents, undo, clock, saving
