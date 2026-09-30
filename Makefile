@@ -71,7 +71,7 @@ TRACES   := build/traces
 OPEN     ?= yes
 
 .PHONY: help xcodegen generate build run logs stop test uitest devices device install profile \
-        profile-mac need-device need-team clean
+        profile-mac archive export upload testflight need-device need-team need-asc clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) \
@@ -153,6 +153,57 @@ profile-mac: build ## The same recording on this Mac (a separate copy; your game
 	@trace="$$(ls -td $(TRACES)/*.trace | head -1)"; \
 	if [ "$(OPEN)" = no ]; then echo ">> saved: $$trace"; else open "$$trace"; fi
 
+# --- TestFlight --------------------------------------------------------------------------------
+# make archive export upload, then make testflight to watch Apple process the builds.
+# Every upload needs a higher build number than the last; the UTC time always is.
+RELEASE_DIR  := build/release
+BUILD_NUMBER ?= $(shell date -u +%Y%m%d%H%M)
+RELEASE_XCB  := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Release
+
+archive: need-team need-asc generate ## Release archives for iOS and the Mac (build number: UTC time)
+	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR) && echo $(BUILD_NUMBER) > $(RELEASE_DIR)/build-number
+	@echo ">> archiving 1.0 ($(BUILD_NUMBER))"
+	@# iOS unsigned: Apple signs it at export. Signing here would need a development profile, and
+	@# those need a registered device, which an upload has no reason to depend on.
+	$(RELEASE_XCB) -destination 'generic/platform=iOS' -archivePath $(RELEASE_DIR)/Solitaire-ios.xcarchive \
+	  CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO archive
+	@# Mac signed with the team: that is what embeds the sandbox entitlement the store requires.
+	$(UNLOCK) $(RELEASE_XCB) -destination 'generic/platform=macOS' -archivePath $(RELEASE_DIR)/Solitaire-macos.xcarchive \
+	  CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) $(KEYCHAIN_FLAG) \
+	  -allowProvisioningUpdates $(ASC_AUTH) archive
+
+export: need-team need-asc ## Sign the archives for the App Store (Apple signs, via the API key) and check them
+	@test -f $(RELEASE_DIR)/build-number || { echo "Run make archive first."; exit 1; }
+	@printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+	  '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+	  '<plist version="1.0"><dict>' \
+	  '<key>method</key><string>app-store-connect</string><key>destination</key><string>export</string>' \
+	  '<key>teamID</key><string>$(DEV_TEAM)</string><key>signingStyle</key><string>automatic</string>' \
+	  '<key>manageAppVersionAndBuildNumber</key><false/>' \
+	  '</dict></plist>' > $(RELEASE_DIR)/ExportOptions.plist
+	@for p in ios macos; do rm -rf $(RELEASE_DIR)/export-$$p; \
+	  echo ">> exporting $$p"; \
+	  $(UNLOCK) xcodebuild -exportArchive -archivePath $(RELEASE_DIR)/Solitaire-$$p.xcarchive \
+	    -exportPath $(RELEASE_DIR)/export-$$p -exportOptionsPlist $(RELEASE_DIR)/ExportOptions.plist \
+	    -allowProvisioningUpdates $(ASC_AUTH) > $(RELEASE_DIR)/export-$$p.log 2>&1 \
+	  || { tail -20 $(RELEASE_DIR)/export-$$p.log; exit 1; }; done
+	TEAM=$(DEV_TEAM) tools/check-release.sh $(RELEASE_DIR)
+
+upload: need-asc ## Upload exactly the checked packages to App Store Connect (TestFlight)
+	@test -f $(RELEASE_DIR)/export-ios/Solitaire.ipa -a -f $(RELEASE_DIR)/export-macos/Solitaire.pkg \
+	  || { echo "Run make archive export first."; exit 1; }
+	TEAM=$(DEV_TEAM) tools/check-release.sh $(RELEASE_DIR)
+	@for f in $(RELEASE_DIR)/export-ios/Solitaire.ipa $(RELEASE_DIR)/export-macos/Solitaire.pkg; do \
+	  echo ">> uploading $$f"; \
+	  xcrun altool --upload-package "$$f" --api-key $(ASC_KEY_ID) --api-issuer $(ASC_ISSUER_ID) \
+	    --p8-file-path "$(ASC_KEY_PATH)" || exit 1; done
+	@echo ">> uploaded 1.0 ($$(cat $(RELEASE_DIR)/build-number)); Apple processes it for a few minutes — make testflight"
+
+testflight: need-asc ## Show recent uploads and whether Apple has finished processing them
+	ASC_ENV="$(ASC_ENV)" tools/asc.py builds
+
+need-asc:
+	@test -n "$(strip $(ASC_KEY_ID))" || { echo "Needs App Store Connect API settings in $(ASC_ENV) — see README › Signing."; exit 1; }
 need-team:
 	@test -n "$(strip $(DEV_TEAM))" || { echo "A device build needs your Apple team ID: echo XXXXXXXXXX > .devteam"; exit 1; }
 
