@@ -128,8 +128,8 @@ SIGNING_KEYCHAIN_PASS_FILE=/Users/me/.config/appstoreconnect/keychain-pass   # c
 ```
 
 The signing keychain holds your Apple Development identity and Apple's WWDR G3 intermediate, with
-its key opened to `codesign` (`security set-key-partition-list`). Distributed builds must not carry
-the `get-task-allow` entitlement (see the spec's decisions).
+its key opened to `codesign` (`security set-key-partition-list`). Distributed builds must not let a
+debugger attach (see the spec's decisions).
 
 **TestFlight.** The App Store Connect app record is **One Off Solitaire** (bundle ID
 `com.oneoffendeavors.solitaire`, iOS and macOS). With the API settings above in place:
