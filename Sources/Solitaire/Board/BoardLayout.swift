@@ -12,6 +12,7 @@ struct CardPlacement: Identifiable, Equatable {
     /// Whether the card is visible edge-on rather than buried under the card above it.
     let isExposed: Bool
     var id: Int { card.id }
+    var isOnFoundation: Bool { if case .foundation = pile { true } else { false } }
 }
 
 struct BoardLayout: Equatable {

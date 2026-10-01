@@ -12,6 +12,8 @@ import SolitaireEngine
 /// macOS double-click acts once, like a tap; hovering highlights the card under the pointer.
 struct BoardView: View {
     let store: GameStore
+    /// Called when the win cascade has finished (or was clicked to skip it).
+    var onCascadeFinished: () -> Void = {}
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragTranslation: CGSize = .zero
     /// True while a drag gesture is live; resets on its own when the system cancels the gesture
@@ -36,9 +38,13 @@ struct BoardView: View {
                 outlines(layout)
                 ForEach(layout.placements) { p in
                     card(p, layout)
+                        // During the cascade the cascade draws the foundations, emptying them as
+                        // the cards fly; the board's own copies stay for VoiceOver, unseen.
+                        .opacity(cascading && p.isOnFoundation ? 0 : 1)
                 }
-                if store.state.isWon && !reduceMotion {
-                    WinCascade(foundations: store.state.foundations, layout: layout)
+                if cascading {
+                    WinCascade(foundations: store.state.foundations, layout: layout,
+                               onFinished: onCascadeFinished)
                         .id(store.state.seed)               // a fresh cascade for every win
                         .zIndex(4000)
                 }
@@ -58,6 +64,9 @@ struct BoardView: View {
             }
         }
     }
+
+    /// The win cascade runs (Reduce Motion: there is none).
+    private var cascading: Bool { store.state.isWon && !reduceMotion }
 
     private func card(_ p: CardPlacement, _ layout: BoardLayout) -> some View {
         let metrics = layout.metrics

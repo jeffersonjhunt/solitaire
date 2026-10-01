@@ -2,13 +2,18 @@ import SwiftUI
 import SolitaireEngine
 
 /// The classic win cascade, in SwiftUI (no SpriteKit): kings first, the cards leap off the
-/// foundations one after another, fall, bounce along the bottom of the board leaving a trail, and
-/// leave the screen. The timeline stops once every card has gone. Not shown under Reduce Motion
+/// foundations one after another — each pile showing the next card down, until all four are
+/// empty — fall, bounce along the bottom of the board leaving a trail, and leave the screen. The
+/// whole trail stays on the felt afterwards. `onFinished` fires once the last card has gone (the
+/// win sheet waits for it), or at once if the cascade is clicked. Not shown under Reduce Motion
 /// (the board decides).
 struct WinCascade: View {
     let foundations: [[Card]]
     let layout: BoardLayout
+    let onFinished: () -> Void
+    @Environment(\.displayScale) private var displayScale
     @State private var simulation = CascadeSimulation()
+    @State private var trail = TrailBitmap()
     @State private var finished = false
 
     var body: some View {
@@ -16,12 +21,29 @@ struct WinCascade: View {
             Canvas { context, size in
                 simulation.advance(to: timeline.date, launches: launches, bounds: size,
                                    cardHeight: layout.metrics.cardHeight)
-                for stamp in simulation.stamps {
+                // The piles: what has not launched yet, under the flying cards.
+                let tops = CascadeSimulation.remainingTops(foundations, launched: simulation.launched)
+                for (f, card) in tops.enumerated() {
+                    guard let card, let symbol = context.resolveSymbol(id: card.id) else { continue }
+                    let slot = layout.slot(.foundation(f))
+                    context.draw(symbol, at: CGPoint(x: slot.midX, y: slot.midY))
+                }
+                // The trail: older stamps baked into one bitmap, the newest drawn card by card.
+                trail.bake(simulation.stamps, size: size, scale: displayScale,
+                           final: simulation.isFinished)
+                if let image = trail.image {
+                    context.draw(Image(decorative: image, scale: displayScale),
+                                 in: CGRect(origin: .zero, size: size))
+                }
+                for stamp in simulation.stamps[trail.baked...] {
                     guard let symbol = context.resolveSymbol(id: stamp.cardID) else { continue }
                     context.draw(symbol, at: stamp.center)
                 }
                 if simulation.isFinished && !finished {
-                    Task { @MainActor in finished = true }     // not during the render pass
+                    Task { @MainActor in                         // not during the render pass
+                        finished = true
+                        onFinished()
+                    }
                 }
             } symbols: {
                 ForEach(foundations.flatMap { $0 }) { card in
@@ -29,25 +51,36 @@ struct WinCascade: View {
                 }
             }
         }
-        .allowsHitTesting(false)
+        .contentShape(Rectangle())
+        .onTapGesture { onFinished() }                          // skip ahead to the win sheet
+        .onAppear { trail.cards = cardImages() }
         .accessibilityHidden(true)
     }
 
     /// Kings first, across the four foundations, then queens, and so on down to the aces.
     private var launches: [(cardID: Int, from: CGPoint)] {
-        (0..<13).reversed().flatMap { rank in
-            (0..<4).compactMap { f -> (Int, CGPoint)? in
-                guard foundations[f].indices.contains(rank) else { return nil }
-                let slot = layout.slot(.foundation(f))
-                return (foundations[f][rank].id, CGPoint(x: slot.midX, y: slot.midY))
-            }
+        CascadeSimulation.launchOrder(foundations).map { card in
+            let f = foundations.firstIndex { $0.contains(card) } ?? 0
+            let slot = layout.slot(.foundation(f))
+            return (card.id, CGPoint(x: slot.midX, y: slot.midY))
         }
+    }
+
+    /// Each card drawn once, for baking into the trail bitmap.
+    private func cardImages() -> [Int: CGImage] {
+        var images: [Int: CGImage] = [:]
+        for card in foundations.flatMap({ $0 }) {
+            let renderer = ImageRenderer(content: CardView(card: card, width: layout.metrics.cardWidth))
+            renderer.scale = displayScale
+            images[card.id] = renderer.cgImage
+        }
+        return images
     }
 }
 
 /// Plain physics in fixed time steps, so the motion and the trail spacing are the same at 60 and
 /// 120 Hz. A reference type so the Canvas can advance it while drawing without triggering view
-/// updates.
+/// updates. Every stamp is kept: the trail is the picture the cascade leaves behind.
 final class CascadeSimulation {
     struct Stamp { let cardID: Int; let center: CGPoint }
     private struct Flyer { let cardID: Int; var position: CGPoint; var velocity: CGVector }
@@ -57,19 +90,32 @@ final class CascadeSimulation {
     static let stampEvery = 2                       // steps: one trail stamp per 1/60 s
     static let gravity: CGFloat = 1600
     static let restitution: CGFloat = 0.72
-    static let maxStamps = 1400
 
     private var start: Date?
     private var simulated: TimeInterval = 0
     private var steps = 0
-    private var launched = 0
     private var total = 0
     private var flyers: [Flyer] = []
     private var rng = SplitMix64(seed: 2026)
+    /// How many cards have left the foundations so far.
+    private(set) var launched = 0
     private(set) var stamps: [Stamp] = []
 
     /// Every card has launched and left the board.
     var isFinished: Bool { total > 0 && launched == total && flyers.isEmpty }
+
+    /// Kings first, across the four foundations, then queens, and so on down to the aces.
+    static func launchOrder(_ foundations: [[Card]]) -> [Card] {
+        (0..<13).reversed().flatMap { rank in
+            foundations.compactMap { $0.indices.contains(rank) ? $0[rank] : nil }
+        }
+    }
+
+    /// The card left showing on each foundation once `launched` cards have flown (nil: empty).
+    static func remainingTops(_ foundations: [[Card]], launched: Int) -> [Card?] {
+        let gone = Set(launchOrder(foundations).prefix(launched).map(\.id))
+        return foundations.map { pile in pile.last { !gone.contains($0.id) } }
+    }
 
     func advance(to now: Date, launches: [(cardID: Int, from: CGPoint)], bounds: CGSize, cardHeight: CGFloat) {
         let start = self.start ?? now
@@ -96,9 +142,6 @@ final class CascadeSimulation {
             }
             flyers.removeAll { $0.position.x < -200 || $0.position.x > bounds.width + 200 }
         }
-        if stamps.count > Self.maxStamps {
-            stamps.removeFirst(stamps.count - Self.maxStamps)
-        }
     }
 
     private func launch(upTo time: TimeInterval, _ launches: [(cardID: Int, from: CGPoint)]) {
@@ -110,5 +153,47 @@ final class CascadeSimulation {
                                 velocity: CGVector(dx: direction * speed, dy: -CGFloat(rng.next() % 240))))
             launched += 1
         }
+    }
+}
+
+/// The trail, accumulated: stamps are drawn once into a bitmap, in batches, so a frame costs one
+/// image plus the latest few hundred cards however long the trail grows. (Redrawing every stamp
+/// each frame is what forced the old cap — and the cap erased the start of the trail.)
+final class TrailBitmap {
+    static let batch = 240                         // stamps per bake: about a quarter second's worth
+    var cards: [Int: CGImage] = [:]
+    private(set) var image: CGImage?
+    private(set) var baked = 0
+    private var context: CGContext?
+
+    /// Bakes the pending stamps once a batch has built up, or all of them when the cascade ends.
+    func bake(_ stamps: [CascadeSimulation.Stamp], size: CGSize, scale: CGFloat, final: Bool) {
+        let pending = stamps.count - baked
+        guard pending > 0, pending >= Self.batch || final, !cards.isEmpty else { return }
+        if context == nil {
+            let w = Int((size.width * scale).rounded(.up)), h = Int((size.height * scale).rounded(.up))
+            guard w > 0, h > 0, let ctx = CGContext(
+                data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+            // Top-left origin, in points — the same space as the stamps.
+            ctx.translateBy(x: 0, y: CGFloat(h))
+            ctx.scaleBy(x: scale, y: -scale)
+            context = ctx
+        }
+        guard let context else { return }
+        for stamp in stamps[baked...] {
+            guard let card = cards[stamp.cardID] else { continue }
+            let w = CGFloat(card.width) / scale, h = CGFloat(card.height) / scale
+            let rect = CGRect(x: stamp.center.x - w / 2, y: stamp.center.y - h / 2, width: w, height: h)
+            // CGContext.draw puts an image's top at the rect's maxY; flip it back locally.
+            context.saveGState()
+            context.translateBy(x: 0, y: rect.midY * 2)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(card, in: rect)
+            context.restoreGState()
+        }
+        baked = stamps.count
+        image = context.makeImage()
     }
 }
