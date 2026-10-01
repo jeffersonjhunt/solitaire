@@ -50,15 +50,65 @@ import SolitaireEngine
     }
 }
 
-@MainActor @Suite struct DrawMode {
-    @Test func toggleChangesTheNextDealNotThisOne() {
+/// Spec "New games and the draw mode": New Game and the draw chip deal at once unless a game in
+/// progress would be lost; then they only ask.
+@MainActor @Suite struct NewGamesAndTheDrawMode {
+    @Test func aFreshDealIsReplacedAtOnce() {
         let store = makeStore(drawCount: 1)
-        store.toggleDrawMode()
-        #expect(store.preferredDrawCount == 3 && store.state.drawCount == 1)
+        let ui = AppUI()
+        #expect(!store.isInProgress, "no move made yet")
+        ui.requestNewGame(drawCount: 3, store: store)               // the chip
+        #expect(ui.pendingNewGame == nil && store.state.drawCount == 3 && store.preferredDrawCount == 3)
+        let seed = store.state.seed
+        ui.requestNewGame(store: store)                             // New Game
+        #expect(ui.pendingNewGame == nil && store.state.seed != seed && store.state.drawCount == 3,
+                "a new deal in the same mode")
+    }
+
+    @Test func aGameInProgressIsAskedAboutAndKeptUntilConfirmed() {
+        let store = makeStore(drawCount: 1)
+        let ui = AppUI()
+        store.tapStock()                                            // a draw counts as a move
+        #expect(store.isInProgress)
+        let before = store.state
+        ui.requestNewGame(drawCount: 3, store: store)
+        #expect(ui.pendingNewGame == NewGameRequest(drawCount: 3, switching: true))
+        #expect(store.state == before && store.preferredDrawCount == 1, "nothing dealt or remembered yet")
+        #expect(ui.pendingNewGame?.title == "Switch to Draw 3?")
+        #expect(ui.pendingNewGame?.confirm == "Start New Game")
+        ui.requestNewGame(store: store)
+        #expect(ui.pendingNewGame == NewGameRequest(drawCount: 1, switching: false))
+        #expect(ui.pendingNewGame?.title == "Start a new game?" && ui.pendingNewGame?.message == "This one will be lost.")
+        #expect(store.state == before)
+    }
+
+    @Test func aWonGameIsReplacedAtOnce() {
+        let store = makeStore(drawCount: 3)
+        let ui = AppUI()
+        let suits: [Suit] = [.spades, .hearts, .diamonds, .clubs]
+        store.resume(from: GameState(stock: [], waste: [],
+                                     foundations: suits.map { s in (1...13).map { Card(suit: s, rank: $0, isFaceUp: true) } },
+                                     tableau: Array(repeating: [], count: 7), drawCount: 3, moveCount: 120, isWon: true))
+        #expect(!store.isInProgress, "won: nothing to lose")
+        ui.requestNewGame(drawCount: 1, store: store)
+        #expect(ui.pendingNewGame == nil && store.state.drawCount == 1 && !store.state.isWon)
+    }
+
+    /// The resumed game's mode is the last deal's: New Game continues in it.
+    @Test func resumingRemembersTheGamesMode() {
+        let store = makeStore(drawCount: 1)
+        var saved = makeStore(drawCount: 3).state
+        saved.moveCount = 5
+        store.resume(from: saved)
+        #expect(store.preferredDrawCount == 3)
         store.newGame()
         #expect(store.state.drawCount == 3)
-        store.newGame(drawCount: 1)
-        #expect(store.preferredDrawCount == 1, "an explicit choice is remembered")
+    }
+
+    @Test func anInvalidCountBecomesDrawOne() {
+        let store = makeStore(drawCount: 3)
+        AppUI().requestNewGame(drawCount: 7, store: store)
+        #expect(store.state.drawCount == 1)
     }
 }
 

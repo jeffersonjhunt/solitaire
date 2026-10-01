@@ -26,7 +26,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !shortScreen { GameHeader(store: store, width: boardWidth) }
+            if !shortScreen { GameHeader(store: store, ui: ui, width: boardWidth) }
             BoardView(store: store) { cascadeFinishedSeed = store.state.seed }   // draws the win cascade itself
                 .onGeometryChange(for: CGFloat.self) { [isTouch = BoardView.isTouch] proxy in
                     BoardMetrics(size: proxy.size, isTouch: isTouch).usedWidth
@@ -54,7 +54,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: Binding(get: { ui.showingSettings }, set: { ui.showingSettings = $0 })) {
             NavigationStack {
-                SettingsView(store: store)
+                SettingsView()
                     .navigationTitle("Settings")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -73,6 +73,18 @@ struct ContentView: View {
             }
         }
         #endif
+        // New Game, the draw chip and the menus ask here before losing a game in progress.
+        .alert(ui.pendingNewGame?.title ?? "",
+               isPresented: Binding(get: { ui.pendingNewGame != nil }, set: { if !$0 { ui.pendingNewGame = nil } }),
+               presenting: ui.pendingNewGame) { request in
+            Button(request.confirm, role: .destructive) {
+                ui.pendingNewGame = nil
+                store.newGame(drawCount: request.drawCount)
+            }
+            Button("Cancel", role: .cancel) { ui.pendingNewGame = nil }
+        } message: { request in
+            Text(request.message)
+        }
         .sheet(isPresented: winSheetShown) {
             WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed,
                      preferredDrawCount: store.preferredDrawCount) { count in

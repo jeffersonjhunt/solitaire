@@ -216,7 +216,7 @@ private func board(_ defect: String) -> GameState {
         let store = makeStore()
         var remembered: [Int] = []
         store.rememberDrawCount = { remembered.append($0) }
-        store.toggleDrawMode()
+        store.newGame(drawCount: 3)
         store.newGame(drawCount: 1)
         store.newGame(drawCount: 1)                                 // unchanged: not written again
         #expect(remembered == [3, 1])

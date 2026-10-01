@@ -91,10 +91,10 @@ func worstCaseState() -> GameState {
         #expect(BoardMetrics(size: BoardSize.mac600.size, isTouch: false).cardWidth >= 50)
     }
 
-    @Test func drawChipShowsTheNextDealWhenItDiffers() {
-        #expect(GameHeader.drawChip(current: 1, next: 1) == ("DRAW 1", "Draw one"))
-        #expect(GameHeader.drawChip(current: 1, next: 3) == ("DRAW 1 · NEXT 3", "Draw one; next game draws three"))
-        #expect(GameHeader.drawChip(current: 3, next: 1).text == "DRAW 3 · NEXT 1")
+    /// The chip shows this game's mode and offers the other (spec "New games and the draw mode").
+    @Test func drawChipShowsThisGamesModeAndOffersTheOther() {
+        #expect(GameHeader.drawChip(current: 1) == ("DRAW 1", "Draw one", "Switches to Draw 3 and starts a new game", 3))
+        #expect(GameHeader.drawChip(current: 3) == ("DRAW 3", "Draw three", "Switches to Draw 1 and starts a new game", 1))
     }
 
     /// A touch board held sideways caps that space at 16 pt — height is what limits its cards.

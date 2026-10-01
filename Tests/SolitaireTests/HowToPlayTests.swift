@@ -42,10 +42,11 @@ import Testing
     @Test func describesThisPlatformsControls() {
         let controls = HowToPlay.sections.first { $0.title == "Controls" }!.lines.joined(separator: "\n")
         #if os(macOS)
-        #expect(controls.contains("**Click**") && controls.contains("**Space**") && controls.contains("Settings (⌘,)"))
+        #expect(controls.contains("**Click**") && controls.contains("**Space**") && controls.contains("Settings (⌘,)")
+                && controls.contains("**DRAW 1 / DRAW 3**"))
         #expect(!controls.contains("**Tap**"))
         #else
-        #expect(controls.contains("**Tap**") && controls.contains("Draw 1 or Draw 3"))
+        #expect(controls.contains("**Tap**") && controls.contains("**DRAW 1 / DRAW 3**") && !controls.contains("Draw 1 or Draw 3"))
         #expect(!controls.contains("**Click**"))
         #endif
         #expect(controls.contains("wiggles") && controls.contains("foundation does nothing"))

@@ -29,7 +29,7 @@ struct SolitaireApp: App {
         .defaultSize(width: 1000, height: 760)
         #endif
         .commands {
-            GameCommands(store: store)
+            GameCommands(store: store, ui: ui)
             HelpCommands(ui: ui)
             #if os(macOS)
             AboutCommands()
@@ -44,7 +44,7 @@ struct SolitaireApp: App {
         .defaultSize(width: 520, height: 640)
 
         Settings {
-            SettingsView(store: store)
+            SettingsView()
                 .frame(width: 440, height: 600)
         }
 
@@ -130,14 +130,15 @@ enum AppSettings {
 /// hardware-keyboard shortcuts.
 struct GameCommands: Commands {
     let store: GameStore
+    let ui: AppUI
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Game") { store.newGame() }
+            Button("New Game") { ui.requestNewGame(store: store) }
                 .keyboardShortcut("n")
             Divider()
-            Button("New Game: Draw 1") { store.newGame(drawCount: 1) }
-            Button("New Game: Draw 3") { store.newGame(drawCount: 3) }
+            Button("New Game: Draw 1") { ui.requestNewGame(drawCount: 1, store: store) }
+            Button("New Game: Draw 3") { ui.requestNewGame(drawCount: 3, store: store) }
         }
         CommandGroup(replacing: .undoRedo) {
             Button("Undo") { store.undo() }
@@ -151,9 +152,10 @@ struct GameCommands: Commands {
                 .keyboardShortcut(.return)
                 .disabled(!store.canAutoFinish)
             Divider()
+            // Switches as the draw chip does: a new deal in the other mode, asked first mid-game.
             Toggle("Draw Three", isOn: Binding(
-                get: { store.preferredDrawCount == 3 },
-                set: { _ in store.toggleDrawMode() }))
+                get: { store.state.drawCount == 3 },
+                set: { ui.requestNewGame(drawCount: $0 ? 3 : 1, store: store) }))
         }
     }
 }
@@ -166,6 +168,8 @@ final class AppUI {
     /// Settings and About as sheets on iPhone and iPad (the Mac uses its own windows).
     var showingSettings = false
     var showingAbout = false
+    /// A new deal waiting for the player to confirm losing the game in progress.
+    var pendingNewGame: NewGameRequest?
 }
 
 /// Help ▸ Solitaire Help (⌘?): the How to Play window on the Mac, the help sheet on iPad with a
