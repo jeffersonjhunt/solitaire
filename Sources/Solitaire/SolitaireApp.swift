@@ -6,6 +6,14 @@ struct SolitaireApp: App {
     @State private var ui = AppUI()
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        AppFont.register()
+    }
+
+    /// The smallest Mac window: tall enough that, under the header and the bottom bar, cards stay
+    /// about 50 pt wide or more.
+    static let minimumWindow = CGSize(width: 600, height: 520)
+
     var body: some Scene {
         WindowGroup {
             ContentView(store: store, ui: ui)
@@ -14,7 +22,7 @@ struct SolitaireApp: App {
                     if phase != .active { store.saveNow() }          // leaving the foreground
                 }
                 #if os(macOS)
-                .frame(minWidth: 600, minHeight: 420)
+                .frame(minWidth: Self.minimumWindow.width, minHeight: Self.minimumWindow.height)
                 #endif
         }
         #if os(macOS)

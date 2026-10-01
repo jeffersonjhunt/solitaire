@@ -8,19 +8,24 @@ import SolitaireEngine
 /// The board area (inside safe areas and the toolbar) for the spec's layout acceptance sizes.
 /// Derived from each device's points: screen − status bar/home indicator/side insets − toolbar.
 enum BoardSize: String, CaseIterable {
-    case iPhoneSEPortrait        // 375 × 667; status 20, bar 50
-    case iPhoneSELandscape       // 667 × 375; bar 50 (no notch, no home indicator)
-    case iPhoneProMaxLandscape   // 956 × 440; side insets 2 × 62, home 21, bar 50
-    case iPadThirdSplit          // 320-pt split column on an 11" iPad; status 24, bar 50
-    case mac600                  // a 600-pt wide Mac window, 460 tall; toolbar 44
+    case iPhoneSEPortrait        // 375 × 667; status 20
+    case iPhoneSELandscape       // 667 × 375
+    case iPhoneProMaxLandscape   // 956 × 440; side insets 2 × 62, home 21
+    case iPadThirdSplit          // 320-pt split column on an 11" iPad; status 24
+    case mac600                  // the smallest Mac window (SolitaireApp.minimumWindow)
 
+    /// The board's space on each: the screen less direction A's header (48 pt) and bottom bar
+    /// (60 pt buttons + 16), and any safe-area insets — on a phone held sideways, only the shorter
+    /// bar the header folds into (52 + 16). The board runs edge to edge.
     var size: CGSize {
-        switch self {
-        case .iPhoneSEPortrait: CGSize(width: 375 - 8, height: 667 - 20 - 50)
-        case .iPhoneSELandscape: CGSize(width: 667 - 8, height: 375 - 50)
-        case .iPhoneProMaxLandscape: CGSize(width: 956 - 124 - 8, height: 440 - 21 - 50)
-        case .iPadThirdSplit: CGSize(width: 320 - 8, height: 1180 - 24 - 50)
-        case .mac600: CGSize(width: 600 - 8, height: 460 - 44)
+        let chrome: CGFloat = 48 + 76
+        let landscapeChrome: CGFloat = 52 + 16
+        return switch self {
+        case .iPhoneSEPortrait: CGSize(width: 375, height: 667 - 20 - chrome)
+        case .iPhoneSELandscape: CGSize(width: 667, height: 375 - landscapeChrome)
+        case .iPhoneProMaxLandscape: CGSize(width: 956 - 124, height: 440 - 21 - landscapeChrome)
+        case .iPadThirdSplit: CGSize(width: 320, height: 1180 - 24 - chrome)
+        case .mac600: CGSize(width: SolitaireApp.minimumWindow.width, height: SolitaireApp.minimumWindow.height - chrome)
         }
     }
 
@@ -58,8 +63,48 @@ func worstCaseState() -> GameState {
         #expect(abs(m.leftEdge - (2000 - m.usedWidth) / 2) < 0.001)
     }
 
-    @Test func gapNeverBelowFourPoints() {
-        #expect(BoardMetrics(size: CGSize(width: 150, height: 2000), isTouch: false).gap == 4)
+    /// Boards 500 pt and wider: gaps are 1.8 % of the width but never under 4 pt, margins equal to them.
+    @Test func wideBoardGapsNeverBelowFourPoints() {
+        let m = BoardMetrics(size: CGSize(width: 520, height: 2000), isTouch: false)
+        #expect(m.gap == 520 * 0.018 || m.gap == 4)
+        #expect(m.gap >= 4 && m.margin == m.gap)
+    }
+
+    /// Direction A: phone-width boards use 3 pt gaps inside 4 pt margins, for bigger cards.
+    @Test func narrowBoardsUseTightGutters() {
+        let m = BoardMetrics(size: CGSize(width: 390, height: 640), isTouch: true)
+        #expect(m.gap == 3 && m.margin == 4)
+        #expect(abs(m.cardWidth - (390 - 2 * 4 - 6 * 3) / 7) < 0.001)
+        #expect(abs(m.leftEdge - 4) < 0.001, "the outer columns sit 4 pt from the edges")
+    }
+
+    /// The space under the top row is 0.8 × card width (portrait phones and the Mac alike).
+    @Test(arguments: [(CGSize(width: 390, height: 640), true), (CGSize(width: 1000, height: 640), false)])
+    func rowGapIsEightyPercentOfACardWidth(_ size: CGSize, _ touch: Bool) {
+        let m = BoardMetrics(size: size, isTouch: touch)
+        #expect(m.rowGapCap == nil)
+        #expect(abs(m.tableauY - (m.topRowY + m.cardHeight) - 0.8 * m.cardWidth) < 0.001)
+    }
+
+    /// The smallest Mac window keeps cards about 50 pt wide (review R3; at 420 pt tall they were ~37).
+    @Test func theSmallestMacWindowKeepsCardsLarge() {
+        #expect(BoardMetrics(size: BoardSize.mac600.size, isTouch: false).cardWidth >= 50)
+    }
+
+    @Test func drawChipShowsTheNextDealWhenItDiffers() {
+        #expect(GameHeader.drawChip(current: 1, next: 1) == ("DRAW 1", "Draw one"))
+        #expect(GameHeader.drawChip(current: 1, next: 3) == ("DRAW 1 · NEXT 3", "Draw one; next game draws three"))
+        #expect(GameHeader.drawChip(current: 3, next: 1).text == "DRAW 3 · NEXT 1")
+    }
+
+    /// A touch board held sideways caps that space at 16 pt — height is what limits its cards.
+    @Test func landscapeTouchBoardsCapTheRowGap() {
+        let m = BoardMetrics(size: BoardSize.iPhoneProMaxLandscape.size, isTouch: true)
+        #expect(m.rowGapCap == 16)
+        #expect(abs(m.rowGap - min(0.8 * m.cardWidth, 16)) < 0.001)
+        #expect(m.tableauY - (m.topRowY + m.cardHeight) <= 16 + 0.001)
+        let mouse = BoardMetrics(size: BoardSize.iPhoneProMaxLandscape.size, isTouch: false)
+        #expect(mouse.rowGapCap == nil, "a Mac window is not a device held sideways")
     }
 
     /// Decision D1: on short, wide boards cards are capped so a column of six face-down cards under
@@ -68,7 +113,7 @@ func worstCaseState() -> GameState {
     func shortWideBoardsCapTheCardSizeByHeight(_ board: BoardSize) {
         let size = board.size
         let m = BoardMetrics(size: size, isTouch: board.isTouch)
-        let byWidth = (min(size.width, 900) - 8 * m.gap) / 7
+        let byWidth = (min(size.width, 900) - 2 * m.margin - 6 * m.gap) / 7
         #expect(m.cardWidth < byWidth, "the height cap should bind here")
         // A real column: six face-down cards under K→5 (nine face-up cards, eight fan steps).
         var s = SolitaireEngine.newGame(drawCount: 1, seed: 1)
@@ -92,13 +137,14 @@ func worstCaseState() -> GameState {
     @Test(arguments: [BoardSize.iPhoneSEPortrait, .iPadThirdSplit])
     func tallBoardsKeepTheWidthRule(_ board: BoardSize) {
         let m = BoardMetrics(size: board.size, isTouch: board.isTouch)
-        #expect(abs(m.cardWidth - (min(board.size.width, 900) - 8 * m.gap) / 7) < 0.001)
+        #expect(abs(m.cardWidth - (min(board.size.width, 900) - 2 * m.margin - 6 * m.gap) / 7) < 0.001)
     }
 
-    /// Decision D2: touch cards narrower than 44 pt compress the gaps and widen the hit area.
+    /// Decision D2: touch cards narrower than 44 pt widen their hit area to the whole column slot
+    /// (on a phone-width board the gaps are already at their tightest, 3 pt).
     @Test func narrowTouchBoardsAreCompressedWithFullHitTargets() {
         let touch = BoardMetrics(size: BoardSize.iPadThirdSplit.size, isTouch: true)
-        #expect(touch.isCompressed && touch.gap == 4)
+        #expect(touch.isCompressed && touch.gap == 3)
         #expect(touch.hitWidth >= 44)
         let mouse = BoardMetrics(size: BoardSize.iPadThirdSplit.size, isTouch: false)
         #expect(!mouse.isCompressed)

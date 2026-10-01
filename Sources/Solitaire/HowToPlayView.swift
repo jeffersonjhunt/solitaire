@@ -88,7 +88,7 @@ enum HowToPlay {
         #if os(macOS)
         "You can turn resuming off in **Settings (⌘,)**."
         #else
-        "You can turn resuming off in the **New Game** options."
+        "You can turn resuming off in **More** or the **New Game** options."
         #endif
     }
 
@@ -97,13 +97,15 @@ enum HowToPlay {
         [
             "**Click** a card to send it to its best spot (double-click works too); **drag** to place it exactly.",
             "**Click the stock** or press **Space** to draw.",
+            "The bar along the bottom: **Undo**, **Finish** (auto-finish, once every card can go home), **New Game** and **More** (How to Play, the draw mode, Settings).",
             "**⌘Z** undo · **⌘N** new game · **⌘↩\u{FE0E}** auto-finish · **File ▸ New Game: Draw 1 / Draw 3** · **Game ▸ Draw Three** · **Settings (⌘,)**.",
             "A card with nowhere to go wiggles. Clicking a card on a foundation does nothing — drag it if you mean to.",
         ]
         #else
         [
             "**Tap** a card to send it to its best spot; **drag** to place it exactly.",
-            "**Tap the stock** to draw. Undo and New Game are in the toolbar; New Game asks for Draw 1 or Draw 3.",
+            "**Tap the stock** to draw.",
+            "The bar along the bottom: **Undo**, **Finish** (auto-finish, once every card can go home), **New Game** — which asks for Draw 1 or Draw 3 — and **More** (How to Play, the draw mode, resuming at launch).",
             "With a keyboard: **⌘Z** undo · **⌘N** new game · **Space** draw · **⌘↩\u{FE0E}** auto-finish.",
             "A card with nowhere to go wiggles. Tapping a card on a foundation does nothing — drag it if you mean to.",
         ]
