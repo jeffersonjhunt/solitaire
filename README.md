@@ -45,15 +45,19 @@ orange in the bar and plays the rest for you. There is no score and no losing �
 | Place a card exactly | drag | drag |
 | Draw / turn the waste over | click the stock, or **Space** | tap the stock |
 | Undo | **⌘Z** or **Undo** in the bar | **Undo** in the bar (⌘Z with a keyboard) |
-| New game | **⌘N** (remembered draw mode), **File ▸ New Game: Draw 1 / Draw 3**, or **New Game** in the bar | **New Game** in the bar: choose Draw 1 or Draw 3 |
+| New game (same draw mode) | **⌘N**, or **New Game** in the bar | **New Game** in the bar |
+| Switch Draw 1 ↔ Draw 3 (deals a new game) | click **DRAW 1 / DRAW 3** in the header, **Game ▸ Draw Three**, or **File ▸ New Game: Draw 1 / Draw 3** | tap **DRAW 1 / DRAW 3** in the header |
 | Auto-finish | **⌘↩︎** or **Finish** in the bar (orange when available) | **Finish** in the bar (orange when available) |
 | How to Play | **Help ▸ Solitaire Help** (⌘?), or **More ▸ How to Play** | **More ▸ How to Play** |
-| Settings: draw mode, resume, card face and back | **Settings (⌘,)**, **More ▸ Settings…**; draw mode also **Game ▸ Draw Three** | **More ▸ Settings…** |
+| Settings: resume, card face and back | **Settings (⌘,)** or **More ▸ Settings…** | **More ▸ Settings…** |
 | About | **Solitaire ▸ About Solitaire**, or **More ▸ About Solitaire** | **More ▸ About Solitaire** |
 
 A card with nowhere to go gives a little wiggle. Tapping a card on a foundation does nothing, so a
 missed tap never pulls a card back down; drag it if you mean to. Once you win, the game is locked:
 nothing moves and undo is off.
+
+Starting a new game or switching draw mode while a game is under way asks first, since the current
+game would be lost; on a fresh deal or after a win it just deals.
 
 ### Saving and settings
 
@@ -61,7 +65,7 @@ The game in progress is saved after every move and every few seconds, and when y
 away; it resumes at the next launch (undo history starts fresh). Quitting normally keeps the time
 exactly; a force quit returns to the last save, at most five seconds earlier.
 
-Settings: the draw mode for the next deal (default: one card), whether to resume the game in
+The draw mode of your last deal is remembered (default: one card). Settings: whether to resume the game in
 progress at launch (default: yes), and the card face (Classic, Big Index, Vintage, Night; default
 Classic) and card back (Classic Blue, Burnt Orange, Racing Green, Art Deco; default Classic
 Blue). Face and back change every card at once, including the game in progress.
@@ -190,7 +194,7 @@ Sources/Solitaire/
   GameStore.swift                the only thing that changes the game: intents, undo, clock, saving
   Persistence.swift              the save file, resume checks, launch decision
   SolitaireApp.swift             app, menus and shortcuts, settings
-  ContentView.swift, GameBar.swift   window, header, bottom bar, More, win sheet, new-game chooser
+  ContentView.swift, GameBar.swift   window, header and draw chip, bottom bar, More, win sheet
   HowToPlayView.swift            the in-app help
   Board/                         layout metrics, card drawing, drag and tap, win cascade
   UITestScenario.swift           Debug-only positions for UI tests and profiling
