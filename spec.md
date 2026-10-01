@@ -141,8 +141,10 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Metric | Rule |
 | --- | --- |
 | Board width | Available width, capped at 900 pt and centred |
-| Gap | 1.8% of board width, minimum 4 pt |
-| Card width | (board width − 8 gaps) / 7 |
+| Gap | 1.8% of board width, minimum 4 pt; boards narrower than 500 pt (phones in portrait): 3 pt |
+| Side margin | Equal to the gap; 4 pt on boards narrower than 500 pt |
+| Card width | (board width − 2 side margins − 6 gaps) / 7 |
+| Row gap | Space between the top row and the columns: card width × 0.8, at most 16 pt on a touch board wider than it is tall |
 | Card height | Card width × 1.4 |
 | Corner radius | Card width × 0.09 |
 | Top row | Stock at column 0, waste at column 1, foundations at columns 3 to 6 |
@@ -150,7 +152,7 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Face-up fan | Card height × 0.29, scaled down together with the face-down fan when a column would overflow the board |
 | Minimum hit target | 44 pt on touch; cards below that width force a compressed layout |
 
-The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. Toolbar placement differs — a bottom bar within reach of the thumb on iPhone, a top toolbar on iPad and Mac, both showing moves, elapsed time, New game, Undo, and Auto-finish when it is available.
+The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with moves, elapsed time and the draw mode in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, the draw mode, and resuming at launch or Settings). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
 
 Cards are drawn in SwiftUI, not images: rank and small suit at the top-left, a large suit at the bottom-right, at `width × 0.36`, `0.28` and `0.62` respectively, in a rounded rectangle with a hairline border and a 1 pt shadow. Card backs use a diagonal repeating pattern in a single colour with an inset border. Reds and blacks come from asset-catalogue colours so both appearances work.
 
@@ -199,3 +201,4 @@ Recorded as they are made; each overrides anything above it conflicts with.
 | 2026-09-27 | "Same elapsed time" after a relaunch: quitting normally (⌘Q on the Mac, or iOS sending the app to the background) saves on the spot, so the time comes back exactly. A true force quit gives the app no chance to save, so the time comes back to the last save — at most five seconds earlier, the spec's own save cadence. |
 | 2026-09-27 | Layout D1 — short, wide boards (phone landscape, short Mac windows): card width is the spec's width rule, capped by height so the top row plus a column of six face-down cards under a nine-card run (K→5) fits with its face-up fan no smaller than 0.2 × card height (readable). Longer runs squeeze further. Where height is plentiful the width rule is unchanged. |
 | 2026-09-27 | Layout D2 — "compressed layout": on touch, when cards would be narrower than 44 pt, gaps drop to the 4 pt minimum and each card's tap area widens to its whole column slot. |
+| 2026-10-01 | Direction A, chosen from mockups (design canvas "Solitaire layout mockups"): one layout for iPhone, iPad and Mac. Phone-width boards (under 500 pt) use 3 pt column gaps and 4 pt side margins, for cards about 9% larger. A row gap of 0.8 × card width separates the top row from the columns, capped at 16 pt on a touch board held sideways. Header (moves, time, draw mode; Space Mono, SIL OFL) over the board; a bottom bar with four labelled 60 pt buttons (Undo, Finish, New Game, More) on every platform, the Mac included; Finish is burnt orange (#CC5500) when auto-finish is available. On a phone held sideways the header folds into the bar (52 pt buttons), which keeps the cards about as large as before. |

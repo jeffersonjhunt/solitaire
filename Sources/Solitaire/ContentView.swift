@@ -1,23 +1,35 @@
 import SwiftUI
 import SolitaireEngine
 
-/// The whole window: the green table, the board, the toolbar (bottom on iPhone, top elsewhere),
-/// and on a win the cascade plus the win sheet with the move count and time.
+/// The whole window, the same on every platform (direction A): the green table, the header with
+/// moves and time, the board, the four-button bar along the bottom, and on a win the cascade
+/// plus the win sheet with the move count and time.
 struct ContentView: View {
     let store: GameStore
     let ui: AppUI
     @State private var dismissedWinSeed: UInt64?
     /// The win whose cascade has finished; the win sheet waits for it, so the cascade plays uncovered.
     @State private var cascadeFinishedSeed: UInt64?
+    /// The width the seven columns actually use, so the header lines up with the cards.
+    @State private var boardWidth: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// A phone held sideways: the header folds into the bar, so the cards keep its height.
+    private var shortScreen: Bool { verticalSizeClass == .compact }
+    #else
+    private let shortScreen = false
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
-            if !Self.barAtBottom { GameBar(store: store, ui: ui) }
+            if !shortScreen { GameHeader(store: store, width: boardWidth) }
             BoardView(store: store) { cascadeFinishedSeed = store.state.seed }   // draws the win cascade itself
-                .padding(.horizontal, 4)
-            if Self.barAtBottom { GameBar(store: store, ui: ui) }
+                .onGeometryChange(for: CGFloat.self) { [isTouch = BoardView.isTouch] proxy in
+                    BoardMetrics(size: proxy.size, isTouch: isTouch).usedWidth
+                } action: { boardWidth = $0 }
+            ActionBar(store: store, ui: ui, withStats: shortScreen)
         }
         .background(TableBackground().ignoresSafeArea())
         #if os(iOS)
@@ -60,18 +72,10 @@ struct ContentView: View {
     /// The win sheet: once per won game, after its cascade so the cascade plays uncovered — but at
     /// once under Reduce Motion (there is no cascade) or VoiceOver (the cascade is silent and can't
     /// be skipped by touch; the sheet is what VoiceOver reads). Closing it leaves the finished board
-    /// and the trail (New Game is in the toolbar).
+    /// and the trail (New Game is in the bar along the bottom).
     nonisolated static func showsWinSheet(isWon: Bool, dismissed: Bool, cascadeFinished: Bool,
                                           reduceMotion: Bool, voiceOver: Bool) -> Bool {
         isWon && !dismissed && (cascadeFinished || reduceMotion || voiceOver)
-    }
-
-    static var barAtBottom: Bool {
-        #if os(iOS)
-        UIDevice.current.userInterfaceIdiom == .phone
-        #else
-        false
-        #endif
     }
 }
 
@@ -96,8 +100,8 @@ struct WinSheet: View {
             Text("You won!").font(.largeTitle.bold())
             HStack(spacing: 24) {
                 Label("\(moves) moves", systemImage: "arrow.left.arrow.right")
-                Label(GameBar.clock(elapsed), systemImage: "clock")
-                    .accessibilityLabel("Time \(GameBar.spokenClock(elapsed))")
+                Label(GameHeader.clock(elapsed), systemImage: "clock")
+                    .accessibilityLabel("Time \(GameHeader.spokenClock(elapsed))")
             }
             .font(.title3.monospacedDigit())
             HStack {
