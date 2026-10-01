@@ -12,6 +12,7 @@ struct WinCascade: View {
     let layout: BoardLayout
     let onFinished: () -> Void
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.cardStyle) private var cardStyle
     @State private var simulation = CascadeSimulation()
     @State private var trail = TrailBitmap()
     @State private var finished = false
@@ -57,8 +58,8 @@ struct WinCascade: View {
             // Usually ready already (the board prepares them once the game can auto-finish).
             let cards = foundations.flatMap { $0 }
             let width = layout.metrics.cardWidth
-            await CardImageCache.shared.prepare(cards, width: width, scale: displayScale)
-            if let images = CardImageCache.shared.images(for: cards, width: width, scale: displayScale) {
+            await CardImageCache.shared.prepare(cards, width: width, scale: displayScale, style: cardStyle)
+            if let images = CardImageCache.shared.images(for: cards, width: width, scale: displayScale, style: cardStyle) {
                 trail.cardScale = displayScale
                 trail.cards = images
             }
@@ -221,31 +222,33 @@ final class TrailBitmap {
 
 /// The cascade's card images, drawn a few per frame and ahead of the win: rendering all 52 at the
 /// instant of winning would stall the cascade's first frames. Keeps one set — the current card
-/// width and scale.
+/// width, scale and card style.
 @MainActor final class CardImageCache {
     static let shared = CardImageCache()
     private var images: [Int: CGImage] = [:]
     private var width: CGFloat = 0
     private var scale: CGFloat = 0
+    private var style = CardStyle()
 
-    func prepare(_ cards: [Card], width: CGFloat, scale: CGFloat) async {
-        if width != self.width || scale != self.scale {
+    func prepare(_ cards: [Card], width: CGFloat, scale: CGFloat, style: CardStyle) async {
+        if width != self.width || scale != self.scale || style != self.style {
             images = [:]
             self.width = width
             self.scale = scale
+            self.style = style
         }
         for card in cards where images[card.id] == nil {
-            let renderer = ImageRenderer(content: CardView(card: card, width: width))
+            let renderer = ImageRenderer(content: CardView(card: card, width: width).environment(\.cardStyle, style))
             renderer.scale = scale
             images[card.id] = renderer.cgImage
             try? await Task.sleep(for: .milliseconds(2))     // let a frame through between cards
-            guard width == self.width, scale == self.scale else { return }   // superseded
+            guard width == self.width, scale == self.scale, style == self.style else { return }   // superseded
         }
     }
 
-    /// All the cards' images at this width and scale, or nil until every one is ready.
-    func images(for cards: [Card], width: CGFloat, scale: CGFloat) -> [Int: CGImage]? {
-        guard width == self.width, scale == self.scale else { return nil }
+    /// All the cards' images at this width, scale and style, or nil until every one is ready.
+    func images(for cards: [Card], width: CGFloat, scale: CGFloat, style: CardStyle) -> [Int: CGImage]? {
+        guard width == self.width, scale == self.scale, style == self.style else { return nil }
         var out: [Int: CGImage] = [:]
         for card in cards {
             guard let image = images[card.id] else { return nil }

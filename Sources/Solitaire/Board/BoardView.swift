@@ -16,6 +16,7 @@ struct BoardView: View {
     var onCascadeFinished: () -> Void = {}
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.cardStyle) private var cardStyle
     @State private var dragTranslation: CGSize = .zero
     /// True while a drag gesture is live; resets on its own when the system cancels the gesture
     /// (which skips `onEnded`), so a cancelled drag still ends and springs home.
@@ -53,12 +54,12 @@ struct BoardView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             // Draw the cascade's card images ahead of the win, a few per frame, once it is in reach.
             .task(id: CascadePrep(near: store.canAutoFinish || store.state.isWon,
-                                  width: metrics.cardWidth, scale: displayScale)) {
+                                  width: metrics.cardWidth, scale: displayScale, style: cardStyle)) {
                 guard !reduceMotion, store.canAutoFinish || store.state.isWon else { return }
                 let s = store.state
                 await CardImageCache.shared.prepare(s.stock + s.waste + s.foundations.flatMap { $0 }
                                                     + s.tableau.flatMap { $0 },
-                                                    width: metrics.cardWidth, scale: displayScale)
+                                                    width: metrics.cardWidth, scale: displayScale, style: cardStyle)
             }
             .coordinateSpace(.named(Self.space))
             .animation(reduceMotion ? nil : Self.moveAnimation, value: store.state)
@@ -75,7 +76,12 @@ struct BoardView: View {
         }
     }
 
-    private struct CascadePrep: Equatable { let near: Bool; let width: CGFloat; let scale: CGFloat }
+    private struct CascadePrep: Equatable {
+        let near: Bool
+        let width: CGFloat
+        let scale: CGFloat
+        let style: CardStyle
+    }
 
     /// The win cascade runs (Reduce Motion: there is none).
     private var cascading: Bool { store.state.isWon && !reduceMotion }

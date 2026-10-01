@@ -441,10 +441,13 @@ func worstCaseState() -> GameState {
     @MainActor @Test func cardImagesArePreparedAheadAndKeptPerSize() async {
         let cards = fullFoundations().flatMap { $0 }
         let cache = CardImageCache()
-        #expect(cache.images(for: cards, width: 60, scale: 2) == nil)
-        await cache.prepare(cards, width: 60, scale: 2)
-        #expect(cache.images(for: cards, width: 60, scale: 2)?.count == 52)
-        #expect(cache.images(for: cards, width: 80, scale: 2) == nil, "another size is another set")
+        let style = CardStyle()
+        #expect(cache.images(for: cards, width: 60, scale: 2, style: style) == nil)
+        await cache.prepare(cards, width: 60, scale: 2, style: style)
+        #expect(cache.images(for: cards, width: 60, scale: 2, style: style)?.count == 52)
+        #expect(cache.images(for: cards, width: 80, scale: 2, style: style) == nil, "another size is another set")
+        #expect(cache.images(for: cards, width: 60, scale: 2, style: CardStyle(face: .night, back: .nightPinstripe)) == nil,
+                "another card style is another set")
     }
 
     @Test(arguments: [

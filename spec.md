@@ -171,7 +171,7 @@ Faces (rank and suit sizes are fractions of the card width):
 | Face | Look |
 | --- | --- |
 | **Classic** (default) | White face; rank in the rounded system font, semibold, × 0.36, small suit × 0.28, top-left; large suit × 0.62, bottom-right; red and black from the asset colours |
-| **Big Index** | White face; a heavier, larger corner index — black weight, rank × 0.38, small suit × 0.30 — in pure black and a bright red (#D0021B); large suit × 0.66, centred |
+| **Big Index** | White face; a heavier, larger corner index — black weight, rank × 0.37, small suit × 0.30 — in pure black and a bright red (#D0021B); large suit × 0.66, centred |
 | **Vintage** | Cream face (#FBF4E4) with a fine inner frame (5 % inset); rank in the system serif (New York), bold; ink #1F1F1F and deep red #9E1B32; large suit centred |
 | **Night** | Dark face (#262626, border #3A3A3A) with light ink: #EDEAE4 for spades and clubs, #FF7A7A for hearts and diamonds; layout as Classic |
 
@@ -188,7 +188,10 @@ Rules every style keeps:
 
 - **Readable when fanned.** A face-up card under another shows only its top strip, which is never
   less than 0.2 × card height (decision D1). Each face's corner index — rank and small suit — fits
-  inside that strip at every card size; a unit test checks it for every face.
+  inside that strip at every card size: the index is placed by its capitals, whose tops sit
+  0.015 × card width below the card's edge (text's own space above the capitals would otherwise
+  push it about 0.09 × width lower). A unit test checks, with the platform's real font metrics,
+  that every face's index ends within the strip.
 - **Red and black stay distinct** (Klondike alternates them): each face has exactly two ink colours,
   one for hearts and diamonds and one for spades and clubs, and they differ in lightness, not hue alone.
 - **No inversion in dark mode:** faces and backs look the same in light and dark appearance; Night
