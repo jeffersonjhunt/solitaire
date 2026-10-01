@@ -7,6 +7,7 @@ Mac app is sandboxed without a network permission, and nothing leaves the device
 - Draw one or draw three, unlimited redeals
 - Tap or click to send a card to its best spot, or drag it exactly where you want it
 - Undo (up to 300 steps), auto-finish, and a card cascade when you win
+- Four card faces and four card backs to choose from (Settings, under **More**)
 - Your game is saved as you play and picks up where you left off
 - VoiceOver labels on every card and empty pile; Reduce Motion turns off all animation
 
@@ -46,9 +47,9 @@ orange in the bar and plays the rest for you. There is no score and no losing �
 | Undo | **⌘Z** or **Undo** in the bar | **Undo** in the bar (⌘Z with a keyboard) |
 | New game | **⌘N** (remembered draw mode), **File ▸ New Game: Draw 1 / Draw 3**, or **New Game** in the bar | **New Game** in the bar: choose Draw 1 or Draw 3 |
 | Auto-finish | **⌘↩︎** or **Finish** in the bar (orange when available) | **Finish** in the bar (orange when available) |
-| How to Play, draw mode | **Help ▸ Solitaire Help** (⌘?), **Game ▸ Draw Three**, or **More** in the bar | **More** in the bar |
-| Draw mode for the next deal | **Game ▸ Draw Three**, or **Settings (⌘,)** | the new-game sheet (iPhone) or popover (iPad) |
-| How to Play | **Help ▸ Solitaire Help** (⌘?) | **How to Play** in the new-game sheet or popover |
+| How to Play | **Help ▸ Solitaire Help** (⌘?), or **More ▸ How to Play** | **More ▸ How to Play** |
+| Settings: draw mode, resume, card face and back | **Settings (⌘,)**, **More ▸ Settings…**; draw mode also **Game ▸ Draw Three** | **More ▸ Settings…** |
+| About | **Solitaire ▸ About Solitaire**, or **More ▸ About Solitaire** | **More ▸ About Solitaire** |
 
 A card with nowhere to go gives a little wiggle. Tapping a card on a foundation does nothing, so a
 missed tap never pulls a card back down; drag it if you mean to. Once you win, the game is locked:
@@ -60,8 +61,10 @@ The game in progress is saved after every move and every few seconds, and when y
 away; it resumes at the next launch (undo history starts fresh). Quitting normally keeps the time
 exactly; a force quit returns to the last save, at most five seconds earlier.
 
-Settings: the draw mode for the next deal (default: one card) and whether to resume the game in
-progress at launch (default: yes).
+Settings: the draw mode for the next deal (default: one card), whether to resume the game in
+progress at launch (default: yes), and the card face (Classic, Big Index, Vintage, Night; default
+Classic) and card back (Classic Blue, Burnt Orange, Racing Green, Night Pinstripe; default Classic
+Blue). Face and back change every card at once, including the game in progress.
 
 Where things live — inside the app's sandbox:
 

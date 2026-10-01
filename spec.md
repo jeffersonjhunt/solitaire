@@ -152,11 +152,84 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Face-up fan | Card height × 0.29, scaled down together with the face-down fan when a column would overflow the board |
 | Minimum hit target | 44 pt on touch; cards below that width force a compressed layout |
 
-The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with moves, elapsed time and the draw mode in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, the draw mode, and resuming at launch or Settings). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
+The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with moves, elapsed time and the draw mode in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
 
-Cards are drawn in SwiftUI, not images: rank and small suit at the top-left, a large suit at the bottom-right, at `width × 0.36`, `0.28` and `0.62` respectively, in a rounded rectangle with a hairline border and a 1 pt shadow. Card backs use a diagonal repeating pattern in a single colour with an inset border. Reds and blacks come from asset-catalogue colours so both appearances work.
+Cards are drawn in SwiftUI, not images, in the face and back the player has chosen (see "Card styles"): a rounded rectangle with a hairline border and a 1 pt shadow, corner index top-left, a large suit below it.
 
 The table is a dark green gradient that the card faces stay readable against in light and dark mode. Card faces do not invert in dark mode. Moves animate with a 0.2 s `.easeOut`; flips use a 0.25 s rotation on the Y axis. All motion is skipped when `accessibilityReduceMotion` is on.
+
+## Card styles
+
+The player chooses a card face and a card back, independently, in Settings (see "Settings, About and
+the More menu"). Four of each ship; the defaults are the original look, so nothing changes for a
+player who never opens Settings. Everything is drawn in SwiftUI from these rules — no image files —
+and every place a card appears uses the chosen style: the board, a drag in progress, the win
+cascade (its cached card images are keyed by style), and the Settings previews.
+
+Faces (rank and suit sizes are fractions of the card width):
+
+| Face | Look |
+| --- | --- |
+| **Classic** (default) | White face; rank in the rounded system font, semibold, × 0.36, small suit × 0.28, top-left; large suit × 0.62, bottom-right; red and black from the asset colours |
+| **Big Index** | White face; a heavier, larger corner index — black weight, rank × 0.38, small suit × 0.30 — in pure black and a bright red (#D0021B); large suit × 0.66, centred |
+| **Vintage** | Cream face (#FBF4E4) with a fine inner frame (5 % inset); rank in the system serif (New York), bold; ink #1F1F1F and deep red #9E1B32; large suit centred |
+| **Night** | Dark face (#262626, border #3A3A3A) with light ink: #EDEAE4 for spades and clubs, #FF7A7A for hearts and diamonds; layout as Classic |
+
+Backs (each a white or tinted card with a patterned panel inset by 7 % of the width):
+
+| Back | Look |
+| --- | --- |
+| **Classic Blue** (default) | White card; blue panel (#1D4E9C) with a white diagonal lattice at 30 % |
+| **Burnt Orange** | The same lattice on #CC5500 |
+| **Racing Green** | Cream card (#F7F1E3); green panel (#1F5E3A) of small cream diamonds at 35 %, with a cream inner frame line |
+| **Night Pinstripe** | Near-black card (#1E1E1E); panel #141414 with a fine #CC5500 pinstripe at 135° and an orange inner frame line |
+
+Rules every style keeps:
+
+- **Readable when fanned.** A face-up card under another shows only its top strip, which is never
+  less than 0.2 × card height (decision D1). Each face's corner index — rank and small suit — fits
+  inside that strip at every card size; a unit test checks it for every face.
+- **Red and black stay distinct** (Klondike alternates them): each face has exactly two ink colours,
+  one for hearts and diamonds and one for spades and clubs, and they differ in lightness, not hue alone.
+- **No inversion in dark mode:** faces and backs look the same in light and dark appearance; Night
+  is a choice, not an automatic mode.
+- **Live:** changing a face or back restyles every card at once, including the game in progress.
+
+## Settings, About and the More menu
+
+**More** (the fourth button of the bottom bar) offers three items on every platform: **How to Play**,
+**Settings…** and **About Solitaire**. On iPhone it is a menu; on iPad and the Mac a popover. On
+the Mac, ⌘, and Solitaire ▸ Settings… open Settings, Solitaire ▸ About Solitaire opens About, and
+Game ▸ Draw Three stays in the menu bar.
+
+**Settings** — a sheet on iPhone and iPad, the Settings window on the Mac:
+
+- **Game:** draw mode for the next deal (one card or three; it does not change the game in
+  progress) and resume the game in progress at launch.
+- **Card face:** the four faces as tappable previews (an ace of hearts in each), the current one
+  ringed in burnt orange (#CC5500).
+- **Card back:** the four backs as tappable previews, ringed the same way.
+- A live preview at the top: the chosen back beside two cards in the chosen face.
+
+Changes apply immediately and are saved at once. The new-game chooser keeps only the choice it
+exists for — Draw 1 or Draw 3 (and Cancel); resuming at launch and How to Play live in Settings and
+More.
+
+**About** — a sheet on iPhone and iPad, its own window on the Mac (replacing the standard About
+panel):
+
+- the app icon, **Solitaire**, and **Version 1.0 (build)** from the bundle;
+- one line: Klondike, made by One Off Endeavors; no ads, no accounts, no tracking — nothing leaves
+  your device;
+- links: **One Off Endeavors** (https://oneoffendeavors.com), **Privacy policy**
+  (https://oneoffendeavors.com/solitaire/privacy/), **Support and feedback**
+  (https://oneoffendeavors.com/support/);
+- **Acknowledgements:** Space Mono, © 2016 The Space Mono Project Authors, SIL Open Font License 1.1,
+  with the licence's full text one tap away;
+- **© 2026 One Off Endeavors**.
+
+A link opens in the user's default browser. The app itself still makes no network connection of any
+kind (on the Mac it remains sandboxed without a network permission).
 
 ## Persistence and settings
 
@@ -164,7 +237,7 @@ The game in progress is saved as JSON to `Application Support/Solitaire/game.jso
 
 On launch the app decodes that file, checks it holds 52 distinct cards and is not already won, and resumes it; anything invalid is discarded silently and a fresh game is dealt. The undo stack is not persisted — a resumed game starts with undo empty.
 
-Settings live in `UserDefaults` via `@AppStorage`: draw count (default 1), and a preference for whether to resume or always deal fresh (default resume). Starting a new game asks for the draw count in a small sheet on iPhone, a popover on iPad, and a menu item pair on Mac, and the choice is remembered for the next deal.
+Settings live in `UserDefaults` via `@AppStorage`: draw count (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic) and the card back (default Classic Blue). An unknown or invalid stored value falls back to the default. Starting a new game asks for the draw count in a small sheet on iPhone, a popover on iPad and the Mac, and the choice is remembered for the next deal.
 
 On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size.
 
@@ -202,3 +275,4 @@ Recorded as they are made; each overrides anything above it conflicts with.
 | 2026-09-27 | Layout D1 — short, wide boards (phone landscape, short Mac windows): card width is the spec's width rule, capped by height so the top row plus a column of six face-down cards under a nine-card run (K→5) fits with its face-up fan no smaller than 0.2 × card height (readable). Longer runs squeeze further. Where height is plentiful the width rule is unchanged. |
 | 2026-09-27 | Layout D2 — "compressed layout": on touch, when cards would be narrower than 44 pt, gaps drop to the 4 pt minimum and each card's tap area widens to its whole column slot. |
 | 2026-10-01 | Direction A, chosen from mockups (design canvas "Solitaire layout mockups"): one layout for iPhone, iPad and Mac. Phone-width boards (under 500 pt) use 3 pt column gaps and 4 pt side margins, for cards about 9% larger. A row gap of 0.8 × card width separates the top row from the columns, capped at 16 pt on a touch board held sideways. Header (moves, time, draw mode; Space Mono, SIL OFL) over the board; a bottom bar with four labelled 60 pt buttons (Undo, Finish, New Game, More) on every platform, the Mac included; Finish is burnt orange (#CC5500) when auto-finish is available. On a phone held sideways the header folds into the bar (52 pt buttons), which keeps the cards about as large as before. |
+| 2026-10-01 | Card styles, Settings and About (plan agreed from the "Cards" and "Settings and About" mockups): faces Classic, Big Index, Vintage and Night; backs Classic Blue, Burnt Orange, Racing Green and Night Pinstripe; chosen independently, Classic + Classic Blue by default, applied live. Four Colour was left out: blue diamonds and green clubs blur Klondike's red/black alternation. More offers How to Play, Settings… and About Solitaire; Draw Three and Resume move into Settings, and the new-game chooser keeps only Draw 1 / Draw 3. About links open in the browser; the app still has no network code. Copyright line: "© 2026 One Off Endeavors". |
