@@ -1,10 +1,10 @@
 import SwiftUI
 import SolitaireEngine
 
-/// One card, drawn in SwiftUI (no images). Face: rank and small suit top-left at width × 0.36 and
-/// × 0.28, a large suit bottom-right at × 0.62, in a rounded rectangle with a hairline border and a
-/// 1 pt shadow. Back: a diagonal pattern in one colour with an inset border. Flipping rotates about
-/// the Y axis; the face never inverts in dark mode.
+/// One card, drawn in SwiftUI (no images), in the face and back of the environment's `cardStyle`
+/// (spec "Card styles"): a rounded rectangle with a hairline border and a 1 pt shadow, the corner
+/// index top-left, a large suit below it; a back is a patterned panel inset in the card. Flipping
+/// rotates about the Y axis; faces never invert in dark mode.
 struct CardView: View {
     let card: Card
     let width: CGFloat
@@ -73,33 +73,46 @@ private struct CardFace: View {
     let card: Card
     let width: CGFloat
     let hasShadow: Bool
+    @Environment(\.cardStyle) private var style
 
     var body: some View {
+        let spec = FaceSpec.of(style.face)
         let shape = RoundedRectangle(cornerRadius: width * 0.09, style: .continuous)
-        let ink = card.suit.isRed ? Color("CardRed") : Color("CardBlack")
+        let ink = card.suit.isRed ? spec.red : spec.black
+        let cap = width * spec.capHeight
         shape
-            .fill(Color("CardFace"))
-            .overlay(shape.strokeBorder(Color.black.opacity(0.25), lineWidth: 0.5))
+            .fill(spec.paper)
+            .overlay {
+                if let frame = spec.frame {
+                    RoundedRectangle(cornerRadius: width * 0.05, style: .continuous)
+                        .strokeBorder(frame, lineWidth: max(width * 0.012, 0.5))
+                        .padding(width * 0.05)
+                }
+            }
+            .overlay(shape.strokeBorder(spec.border, lineWidth: 0.5))
             .shadow(color: .black.opacity(hasShadow ? 0.3 : 0), radius: 1, y: 1)
             .overlay(alignment: .topLeading) {
                 HStack(alignment: .firstTextBaseline, spacing: width * 0.01) {
                     Text(CardView.rankText(card.rank))
-                        .font(.system(size: width * 0.36, weight: .semibold, design: .rounded))
+                        .font(.system(size: width * spec.rankSize, weight: spec.rankWeight, design: spec.rankDesign))
                     Text(CardView.suitSymbol(card.suit))
-                        .font(.system(size: width * 0.28))
+                        .font(.system(size: width * spec.suitSize))
                 }
                 .foregroundStyle(ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.leading, width * 0.07)
-                .padding(.top, width * 0.02)
+                .fixedSize()
+                // Placed by its capitals, not its line box: the caps' tops sit `indexTop` below the
+                // edge, so the index fits the narrowest fanned strip (decision D1).
+                .alignmentGuide(.top) { d in d[.firstTextBaseline] - cap }
+                .offset(x: width * FaceSpec.indexLeading, y: width * FaceSpec.indexTop)
             }
-            .overlay(alignment: .bottomTrailing) {
+            .overlay(alignment: spec.pip == .corner ? .bottomTrailing : .center) {
                 Text(CardView.suitSymbol(card.suit))
-                    .font(.system(size: width * 0.62))
+                    .font(.system(size: width * spec.pipSize))
                     .foregroundStyle(ink)
-                    .padding(.trailing, width * 0.06)
-                    .padding(.bottom, width * 0.01)
+                    .padding(.trailing, spec.pip == .corner ? width * 0.06 : 0)
+                    .padding(.bottom, spec.pip == .corner ? width * 0.01 : 0)
+                    .offset(y: spec.pip == .center ? width * 0.12 : 0)
             }
             .environment(\.colorScheme, .light)
     }
@@ -108,25 +121,91 @@ private struct CardFace: View {
 private struct CardBack: View {
     let width: CGFloat
     let hasShadow: Bool
+    @Environment(\.cardStyle) private var style
 
     var body: some View {
+        let spec = BackSpec.of(style.back)
         let radius = width * 0.09
+        let inset = width * 0.07
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let panel = RoundedRectangle(cornerRadius: max(radius - inset, 1), style: .continuous)
         shape
-            .fill(Color("CardFace"))
+            .fill(spec.paper)
             .overlay {
-                let inset = width * 0.07
-                RoundedRectangle(cornerRadius: max(radius - inset, 1), style: .continuous)
-                    .fill(Color("CardBack"))
+                panel
+                    .fill(spec.panel)
+                    .overlay { pattern(spec) }
                     .overlay {
-                        DiagonalPattern(spacing: width * 0.1)
-                            .stroke(Color("CardFace").opacity(0.35), lineWidth: max(width * 0.02, 0.5))
+                        if let frame = spec.frame {
+                            RoundedRectangle(cornerRadius: max(radius - inset - width * 0.035, 1), style: .continuous)
+                                .strokeBorder(frame, lineWidth: max(width * 0.015, 0.5))
+                                .padding(width * 0.035)
+                        }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: max(radius - inset, 1), style: .continuous))
+                    .clipShape(panel)
                     .padding(inset)
             }
             .overlay(shape.strokeBorder(Color.black.opacity(0.25), lineWidth: 0.5))
             .shadow(color: .black.opacity(hasShadow ? 0.3 : 0), radius: 1, y: 1)
+    }
+
+    @ViewBuilder
+    private func pattern(_ spec: BackSpec) -> some View {
+        switch spec.pattern {
+        case .lattice:
+            DiagonalPattern(spacing: width * 0.1)
+                .stroke(spec.ink, lineWidth: max(width * 0.02, 0.5))
+        case .diamonds:
+            DiamondGrid(spacing: width * 0.1).fill(spec.ink)
+        case .rays:
+            SunRays().fill(spec.ink)
+        }
+    }
+}
+
+/// Small diamonds on a staggered grid, filling the rect.
+private struct DiamondGrid: Shape {
+    let spacing: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let s = max(spacing, 3)
+        let r = s * 0.28
+        var row = 0
+        var y = rect.minY
+        while y <= rect.maxY + s {
+            var x = rect.minX + (row.isMultiple(of: 2) ? 0 : s / 2)
+            while x <= rect.maxX + s {
+                p.move(to: CGPoint(x: x, y: y - r))
+                p.addLine(to: CGPoint(x: x + r, y: y))
+                p.addLine(to: CGPoint(x: x, y: y + r))
+                p.addLine(to: CGPoint(x: x - r, y: y))
+                p.closeSubpath()
+                x += s
+            }
+            y += s / 2
+            row += 1
+        }
+        return p
+    }
+}
+
+/// Rays fanning up from the middle of the bottom edge: 4° wide, every 12°, from the left
+/// horizontal round to the right, reaching past the rect's corners.
+private struct SunRays: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let centre = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = hypot(rect.width, rect.height)
+        var angle = 180.0
+        while angle < 360 {
+            p.move(to: centre)
+            p.addArc(center: centre, radius: radius, startAngle: .degrees(angle),
+                     endAngle: .degrees(angle + 4), clockwise: false)
+            p.closeSubpath()
+            angle += 12
+        }
+        return p
     }
 }
 

@@ -111,9 +111,7 @@ struct ActionBar: View {
     let ui: AppUI
     var withStats = false
     @State private var choosingNewGame = false
-    #if os(iOS)
-    @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
-    #else
+    #if os(macOS)
     @State private var showingMore = false
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -149,10 +147,6 @@ struct ActionBar: View {
         .buttonStyle(BarButtonStyle())
     }
 
-    private var drawThree: Binding<Bool> {
-        Binding(get: { store.preferredDrawCount == 3 }, set: { _ in store.toggleDrawMode() })
-    }
-
     /// Starting a new game asks for the draw count (spec): a small sheet on iPhone, a popover on
     /// iPad and the Mac. The choice is remembered for the next deal.
     @ViewBuilder
@@ -165,19 +159,13 @@ struct ActionBar: View {
             if UIDevice.current.userInterfaceIdiom == .phone {
                 button.sheet(isPresented: $choosingNewGame) {
                     NewGameChooser(store: store, ui: ui) { choosingNewGame = false }
-                        .presentationDetents([.height(340)])
+                        .presentationDetents([.height(220)])
                 }
             } else {
                 button.popover(isPresented: $choosingNewGame) {
                     NewGameChooser(store: store, ui: ui) { choosingNewGame = false }
                         .frame(width: 320)
                 }
-            }
-        }
-        .onChange(of: choosingNewGame) { _, open in
-            if !open, ui.helpAfterChooser {                    // the chooser asked for help
-                ui.helpAfterChooser = false
-                ui.showingHelp = true
             }
         }
         #else
@@ -200,14 +188,14 @@ struct ActionBar: View {
         #endif
     }
 
-    /// How to Play, the draw mode for the next deal, and (iOS) resuming at launch or (Mac) Settings.
+    /// How to Play, Settings… and About Solitaire (spec "Settings, About and the More menu").
     @ViewBuilder
     private var moreControl: some View {
         #if os(iOS)
         Menu {
             Button("How to Play", systemImage: "questionmark.circle") { ui.showingHelp = true }
-            Toggle("Draw Three", isOn: drawThree)
-            Toggle("Resume at launch", isOn: $resumeOnLaunch)
+            Button("Settings…", systemImage: "gearshape") { ui.showingSettings = true }
+            Button("About Solitaire", systemImage: "info.circle") { ui.showingAbout = true }
         } label: {
             BarLabel(title: "More", symbol: "ellipsis.circle")
         }
@@ -220,8 +208,11 @@ struct ActionBar: View {
                         showingMore = false
                         openWindow(id: HelpCommands.windowID)
                     }
-                    Toggle("Draw Three", isOn: drawThree)
                     SettingsLink { Text("Settings…") }
+                    Button("About Solitaire") {
+                        showingMore = false
+                        openWindow(id: AboutCommands.windowID)
+                    }
                 }
                 .padding(16)
             }
@@ -272,12 +263,11 @@ struct BarButtonStyle: ButtonStyle {
 
 #if os(iOS)
 /// The new-game choice on iPhone (sheet) and iPad (popover): the two draw modes, the current one
-/// marked, plus the resume-at-launch setting.
+/// marked. Resuming at launch and How to Play live in Settings and More.
 struct NewGameChooser: View {
     let store: GameStore
     let ui: AppUI
     let done: () -> Void
-    @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
 
     var body: some View {
         VStack(spacing: 16) {
@@ -286,16 +276,7 @@ struct NewGameChooser: View {
                 choice("Draw 1", count: 1)
                 choice("Draw 3", count: 3)
             }
-            Toggle("Resume at launch", isOn: $resumeOnLaunch)
-                .font(.subheadline)
-            HStack {
-                Button("How to Play", systemImage: "questionmark.circle") {
-                    ui.helpAfterChooser = true
-                    done()
-                }
-                Spacer()
-                Button("Cancel", role: .cancel, action: done)
-            }
+            Button("Cancel", role: .cancel, action: done)
         }
         .padding(24)
     }

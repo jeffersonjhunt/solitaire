@@ -142,6 +142,11 @@ MainActor.assumeIsolated {
     let ios = render(Artwork())
     let mac = render(MacIcon())
     writePNG(resized(ios, 1024, opaque: true), out.appendingPathComponent("icon-ios-1024.png"))
+    // The About screen shows the same artwork (an imageset beside the app icon set).
+    let about = out.deletingLastPathComponent().appendingPathComponent("AboutIcon.imageset")
+    if FileManager.default.fileExists(atPath: about.path) {
+        writePNG(resized(ios, 1024, opaque: true), about.appendingPathComponent("about-icon.png"))
+    }
     var images: [[String: String]] = [
         ["idiom": "universal", "platform": "ios", "size": "1024x1024", "filename": "icon-ios-1024.png"],
     ]

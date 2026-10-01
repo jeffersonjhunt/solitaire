@@ -14,7 +14,10 @@ final class SolitaireUITests: XCTestCase {
 
     /// Launches the app with a Debug scenario or seed, passed in the environment (see
     /// UITestScenario). `reset: false` keeps the previous launch's save — for relaunch tests.
-    private func launch(scenario: String? = nil, seed: UInt64? = nil, reset: Bool = true) -> XCUIApplication {
+    /// `arguments` are extra launch arguments, e.g. `["-cardFace", "night"]` to put a value in the
+    /// arguments domain, which every UserDefaults read sees first.
+    private func launch(scenario: String? = nil, seed: UInt64? = nil, reset: Bool = true,
+                        arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["SOLITAIRE_SAVE_FILE"] = isolation
         app.launchEnvironment["SOLITAIRE_DEFAULTS_SUITE"] = isolation
@@ -22,7 +25,7 @@ final class SolitaireUITests: XCTestCase {
         // Ignore saved window state, as Xcode does for the unit-test host. A run that quit with no
         // window open saves "no windows", and XCUITest's launch (unlike Finder or the Dock) does not
         // send the "open application" event that would open one anyway — the app came up windowless.
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"] + arguments
         if let scenario { app.launchEnvironment["SOLITAIRE_SCENARIO"] = scenario }
         if let seed { app.launchEnvironment["SOLITAIRE_SEED"] = String(seed) }
         app.launch()
@@ -225,7 +228,7 @@ final class SolitaireUITests: XCTestCase {
     }
 
     /// How to Play opens from where the spec's help lives on each platform: Help ▸ Solitaire Help
-    /// on the Mac (a window), the new-game chooser on iPhone (a sheet, closed with Done).
+    /// on the Mac (a window), More ▸ How to Play on iPhone (a sheet, closed with Done).
     func testHowToPlayOpens() {
         let app = launch(seed: 4)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
@@ -235,13 +238,66 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(app.windows["How to Play"].waitForExistence(timeout: 5), "the help window")
         XCTAssertTrue(text(app, equalTo: "Goal").exists)
         #else
-        app.buttons["New Game"].press()
-        XCTAssertTrue(app.buttons["How to Play"].waitForExistence(timeout: 5))
-        app.buttons["How to Play"].press()
+        more(app, "How to Play")
         XCTAssertTrue(text(app, equalTo: "Goal").waitForExistence(timeout: 5), "the help sheet")
         app.buttons["Done"].press()
         XCTAssertTrue(text(app, equalTo: "Goal").waitForNonExistence(timeout: 5), "Done closes it")
         #endif
+    }
+
+    /// Settings, from More: a face and back chosen there apply at once and are remembered.
+    func testSettingsChooseTheCardStyleAndRememberIt() {
+        var app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings…")
+        let night = app.buttons["Night"].firstMatch
+        XCTAssertTrue(night.waitForExistence(timeout: 5))
+        XCTAssertFalse(night.isSelected, "Classic is the default")
+        night.press()
+        app.buttons["Art Deco"].firstMatch.press()
+        XCTAssertTrue(night.isSelected)
+        app.terminate()
+        app = launch(seed: 4, reset: false)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings…")
+        XCTAssertTrue(app.buttons["Night"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Night"].firstMatch.isSelected, "remembered")
+        XCTAssertTrue(app.buttons["Art Deco"].firstMatch.isSelected, "remembered")
+    }
+
+    /// A saved face or back this version doesn't know (from an older or newer one) reads as the
+    /// default rather than breaking the cards or Settings.
+    func testUnknownSavedCardStyleFallsBackToTheDefault() {
+        let app = launch(seed: 4, arguments: ["-cardFace", "tartan", "-cardBack", "plaid"])
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings…")
+        XCTAssertTrue(app.buttons["Classic"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Classic"].firstMatch.isSelected, "face falls back to Classic")
+        XCTAssertTrue(app.buttons["Classic Blue"].firstMatch.isSelected, "back falls back to Classic Blue")
+    }
+
+    /// About, from More: the version and the links to the site, the privacy policy and support.
+    func testAboutShowsTheVersionAndLinks() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "About Solitaire")
+        // iOS exposes static text as its label, macOS as its value.
+        let version = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
+                                                           "Version 1.0", "Version 1.0")).firstMatch
+        XCTAssertTrue(version.waitForExistence(timeout: 5), "the version line")
+        for link in ["One Off Endeavors", "Privacy policy", "Support and feedback"] {
+            XCTAssertTrue(app.descendants(matching: .any)[link].firstMatch.exists, link)
+        }
+    }
+
+    /// Opens More and chooses `item` (a menu on iPhone, a popover on the Mac).
+    private func more(_ app: XCUIApplication, _ item: String) {
+        let button = app.buttons["More"].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.press()
+        let entry = app.buttons[item].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), item)
+        entry.press()
     }
 
     /// A tap on the stock draws; undo puts it back.

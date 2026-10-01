@@ -63,7 +63,7 @@ exactly; a force quit returns to the last save, at most five seconds earlier.
 
 Settings: the draw mode for the next deal (default: one card), whether to resume the game in
 progress at launch (default: yes), and the card face (Classic, Big Index, Vintage, Night; default
-Classic) and card back (Classic Blue, Burnt Orange, Racing Green, Night Pinstripe; default Classic
+Classic) and card back (Classic Blue, Burnt Orange, Racing Green, Art Deco; default Classic
 Blue). Face and back change every card at once, including the game in progress.
 
 Where things live — inside the app's sandbox:

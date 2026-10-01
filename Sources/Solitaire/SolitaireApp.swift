@@ -31,6 +31,9 @@ struct SolitaireApp: App {
         .commands {
             GameCommands(store: store)
             HelpCommands(ui: ui)
+            #if os(macOS)
+            AboutCommands()
+            #endif
         }
 
         #if os(macOS)
@@ -42,9 +45,14 @@ struct SolitaireApp: App {
 
         Settings {
             SettingsView(store: store)
-                .frame(width: 320)
-                .padding(20)
+                .frame(width: 440, height: 600)
         }
+
+        Window("About Solitaire", id: AboutCommands.windowID) {
+            AboutView()
+                .frame(width: 380)
+        }
+        .windowResizability(.contentSize)
         #endif
     }
 
@@ -101,6 +109,9 @@ struct SolitaireApp: App {
 enum AppSettings {
     static let drawCountKey = "drawCount"
     static let resumeKey = "resumeOnLaunch"
+    /// The card face and back (spec "Card styles"); an unknown stored value reads as the default.
+    static let cardFaceKey = "cardFace"
+    static let cardBackKey = "cardBack"
 
     static var defaults: UserDefaults {
         #if DEBUG
@@ -147,32 +158,14 @@ struct GameCommands: Commands {
     }
 }
 
-/// The two settings. On the Mac this is the Settings window (⌘,); on iPhone and iPad the same
-/// controls sit in the new-game sheet or popover.
-struct SettingsView: View {
-    let store: GameStore
-    @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
-
-    var body: some View {
-        Form {
-            Picker("Draw", selection: Binding(
-                get: { store.preferredDrawCount },
-                set: { store.preferredDrawCount = GameStore.validDrawCount($0) })) {
-                Text("One card").tag(1)
-                Text("Three cards").tag(3)
-            }
-            Toggle("Resume the game in progress at launch", isOn: $resumeOnLaunch)
-        }
-    }
-}
 
 /// State for presentations that are not game state: the How to Play sheet on iPhone and iPad.
 @Observable @MainActor
 final class AppUI {
     var showingHelp = false
-    /// Asked for from the new-game chooser: shown once the chooser has finished closing (two
-    /// sheets cannot be up at once).
-    var helpAfterChooser = false
+    /// Settings and About as sheets on iPhone and iPad (the Mac uses its own windows).
+    var showingSettings = false
+    var showingAbout = false
 }
 
 /// Help ▸ Solitaire Help (⌘?): the How to Play window on the Mac, the help sheet on iPad with a
@@ -197,3 +190,17 @@ struct HelpCommands: Commands {
         }
     }
 }
+
+#if os(macOS)
+/// Solitaire ▸ About Solitaire opens the app's own About window, replacing the standard panel.
+struct AboutCommands: Commands {
+    static let windowID = "about"
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Solitaire") { openWindow(id: Self.windowID) }
+        }
+    }
+}
+#endif

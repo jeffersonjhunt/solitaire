@@ -171,7 +171,7 @@ Faces (rank and suit sizes are fractions of the card width):
 | Face | Look |
 | --- | --- |
 | **Classic** (default) | White face; rank in the rounded system font, semibold, × 0.36, small suit × 0.28, top-left; large suit × 0.62, bottom-right; red and black from the asset colours |
-| **Big Index** | White face; a heavier, larger corner index — black weight, rank × 0.38, small suit × 0.30 — in pure black and a bright red (#D0021B); large suit × 0.66, centred |
+| **Big Index** | White face; a heavier, larger corner index — black weight, rank × 0.37, small suit × 0.30 — in pure black and a bright red (#D0021B); large suit × 0.66, centred |
 | **Vintage** | Cream face (#FBF4E4) with a fine inner frame (5 % inset); rank in the system serif (New York), bold; ink #1F1F1F and deep red #9E1B32; large suit centred |
 | **Night** | Dark face (#262626, border #3A3A3A) with light ink: #EDEAE4 for spades and clubs, #FF7A7A for hearts and diamonds; layout as Classic |
 
@@ -182,13 +182,16 @@ Backs (each a white or tinted card with a patterned panel inset by 7 % of the wi
 | **Classic Blue** (default) | White card; blue panel (#1D4E9C) with a white diagonal lattice at 30 % |
 | **Burnt Orange** | The same lattice on #CC5500 |
 | **Racing Green** | Cream card (#F7F1E3); green panel (#1F5E3A) of small cream diamonds at 35 %, with a cream inner frame line |
-| **Night Pinstripe** | Near-black card (#1E1E1E); panel #141414 with a fine #CC5500 pinstripe at 135° and an orange inner frame line |
+| **Art Deco** | Cream card (#F7F1E3); navy panel (#1B2A4A) with gold rays (#C9A227 at 75 %) fanning up from the middle of the bottom edge — 4° wide, every 12° — and a gold inner frame line |
 
 Rules every style keeps:
 
 - **Readable when fanned.** A face-up card under another shows only its top strip, which is never
-  less than 0.2 × card height (decision D1). Each face's corner index — rank and small suit — fits
-  inside that strip at every card size; a unit test checks it for every face.
+  less than 0.24 × card height (decision D1). Each face's corner index — rank and small suit — fits
+  inside that strip at every card size: the index is placed by its capitals, whose tops sit
+  0.07 × card width below the card's edge, the same margin as at its left (text's own space above the capitals would otherwise
+  push it about 0.09 × width lower). A unit test checks, with the platform's real font metrics,
+  that every face's index ends within the strip.
 - **Red and black stay distinct** (Klondike alternates them): each face has exactly two ink colours,
   one for hearts and diamonds and one for spades and clubs, and they differ in lightness, not hue alone.
 - **No inversion in dark mode:** faces and backs look the same in light and dark appearance; Night
@@ -272,7 +275,8 @@ Recorded as they are made; each overrides anything above it conflicts with.
 | 2026-09-27 (wording 2026-09-30) | Any build distributed outside this Mac (TestFlight, App Store, a shared `.app`) must not let a debugger attach: on the Mac the `com.apple.security.get-task-allow` entitlement is absent; on iOS/iPadOS `get-task-allow` is `false` (App Store signing always writes the key, set to false). Local development builds allow it, and that is fine for development. `tools/check-release.sh` enforces this before every upload. |
 | 2026-09-27 | New games ask for the draw count everywhere (toolbar, win sheet) except ⌘N, which the spec lists as a direct shortcut: it deals at once in the remembered mode. |
 | 2026-09-27 | "Same elapsed time" after a relaunch: quitting normally (⌘Q on the Mac, or iOS sending the app to the background) saves on the spot, so the time comes back exactly. A true force quit gives the app no chance to save, so the time comes back to the last save — at most five seconds earlier, the spec's own save cadence. |
-| 2026-09-27 | Layout D1 — short, wide boards (phone landscape, short Mac windows): card width is the spec's width rule, capped by height so the top row plus a column of six face-down cards under a nine-card run (K→5) fits with its face-up fan no smaller than 0.2 × card height (readable). Longer runs squeeze further. Where height is plentiful the width rule is unchanged. |
+| 2026-09-27 | Layout D1 — short, wide boards (phone landscape, short Mac windows): card width is the spec's width rule, capped by height so the top row plus a column of six face-down cards under a nine-card run (K→5) fits with its face-up fan no smaller than 0.24 × card height (readable; 0.2 until the corner index gained a top margin on 2026-10-01). Longer runs squeeze further. Where height is plentiful the width rule is unchanged. |
 | 2026-09-27 | Layout D2 — "compressed layout": on touch, when cards would be narrower than 44 pt, gaps drop to the 4 pt minimum and each card's tap area widens to its whole column slot. |
 | 2026-10-01 | Direction A, chosen from mockups (design canvas "Solitaire layout mockups"): one layout for iPhone, iPad and Mac. Phone-width boards (under 500 pt) use 3 pt column gaps and 4 pt side margins, for cards about 9% larger. A row gap of 0.8 × card width separates the top row from the columns, capped at 16 pt on a touch board held sideways. Header (moves, time, draw mode; Space Mono, SIL OFL) over the board; a bottom bar with four labelled 60 pt buttons (Undo, Finish, New Game, More) on every platform, the Mac included; Finish is burnt orange (#CC5500) when auto-finish is available. On a phone held sideways the header folds into the bar (52 pt buttons), which keeps the cards about as large as before. |
-| 2026-10-01 | Card styles, Settings and About (plan agreed from the "Cards" and "Settings and About" mockups): faces Classic, Big Index, Vintage and Night; backs Classic Blue, Burnt Orange, Racing Green and Night Pinstripe; chosen independently, Classic + Classic Blue by default, applied live. Four Colour was left out: blue diamonds and green clubs blur Klondike's red/black alternation. More offers How to Play, Settings… and About Solitaire; Draw Three and Resume move into Settings, and the new-game chooser keeps only Draw 1 / Draw 3. About links open in the browser; the app still has no network code. Copyright line: "© 2026 One Off Endeavors". |
+| 2026-10-01 | Card styles, Settings and About (plan agreed from the "Cards" and "Settings and About" mockups): faces Classic, Big Index, Vintage and Night; backs Classic Blue, Burnt Orange, Racing Green and Art Deco (Art Deco replaced Night Pinstripe after a look on TestFlight); chosen independently, Classic + Classic Blue by default, applied live. Four Colour was left out: blue diamonds and green clubs blur Klondike's red/black alternation. More offers How to Play, Settings… and About Solitaire; Draw Three and Resume move into Settings, and the new-game chooser keeps only Draw 1 / Draw 3. About links open in the browser; the app still has no network code. Copyright line: "© 2026 One Off Endeavors". |
+| 2026-10-01 | Corner index margin (after a look at TestFlight build 202610012043): the index sat almost on the card's top edge. It now has a 0.07 × card width margin above it, as at its left, at full size; to keep D1's promise that it reads in the tightest fan, the minimum face-up fan rises from 0.2 to 0.24 × card height. Portrait boards are unchanged; on a phone held sideways or a short Mac window cards come out about 8 % smaller. |
