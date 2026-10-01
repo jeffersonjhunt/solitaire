@@ -34,7 +34,7 @@ import Testing
         #if os(macOS)
         #expect(saving.contains("Settings (⌘,)"))
         #else
-        #expect(saving.contains("New Game") && !saving.contains("settings."))
+        #expect(saving.contains("More ▸ Settings…") && !saving.contains("New Game"))
         #endif
     }
 

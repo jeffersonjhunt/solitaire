@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var boardWidth: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var cardFace = CardFaceStyle.classic
+    @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var cardBack = CardBackStyle.classicBlue
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// A phone held sideways: the header folds into the bar, so the cards keep its height.
@@ -32,6 +34,7 @@ struct ContentView: View {
             ActionBar(store: store, ui: ui, withStats: shortScreen)
         }
         .background(TableBackground().ignoresSafeArea())
+        .environment(\.cardStyle, CardStyle(face: cardFace, back: cardBack))
         #if os(iOS)
         // Haptics, iOS and iPadOS only: light on a move, soft on a draw, success on a win.
         .sensoryFeedback(trigger: store.feedback) { _, event in
@@ -47,6 +50,26 @@ struct ContentView: View {
         .sheet(isPresented: Binding(get: { ui.showingHelp }, set: { ui.showingHelp = $0 })) {
             NavigationStack {
                 HowToPlayView { ui.showingHelp = false }
+            }
+        }
+        .sheet(isPresented: Binding(get: { ui.showingSettings }, set: { ui.showingSettings = $0 })) {
+            NavigationStack {
+                SettingsView(store: store)
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Done") { ui.showingSettings = false } }
+                    }
+            }
+        }
+        .sheet(isPresented: Binding(get: { ui.showingAbout }, set: { ui.showingAbout = $0 })) {
+            NavigationStack {
+                AboutView()
+                    .navigationTitle("About")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Done") { ui.showingAbout = false } }
+                    }
             }
         }
         #endif

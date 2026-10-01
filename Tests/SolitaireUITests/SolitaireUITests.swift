@@ -225,7 +225,7 @@ final class SolitaireUITests: XCTestCase {
     }
 
     /// How to Play opens from where the spec's help lives on each platform: Help ▸ Solitaire Help
-    /// on the Mac (a window), the new-game chooser on iPhone (a sheet, closed with Done).
+    /// on the Mac (a window), More ▸ How to Play on iPhone (a sheet, closed with Done).
     func testHowToPlayOpens() {
         let app = launch(seed: 4)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
@@ -235,13 +235,55 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(app.windows["How to Play"].waitForExistence(timeout: 5), "the help window")
         XCTAssertTrue(text(app, equalTo: "Goal").exists)
         #else
-        app.buttons["New Game"].press()
-        XCTAssertTrue(app.buttons["How to Play"].waitForExistence(timeout: 5))
-        app.buttons["How to Play"].press()
+        more(app, "How to Play")
         XCTAssertTrue(text(app, equalTo: "Goal").waitForExistence(timeout: 5), "the help sheet")
         app.buttons["Done"].press()
         XCTAssertTrue(text(app, equalTo: "Goal").waitForNonExistence(timeout: 5), "Done closes it")
         #endif
+    }
+
+    /// Settings, from More: a face and back chosen there apply at once and are remembered.
+    func testSettingsChooseTheCardStyleAndRememberIt() {
+        var app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings…")
+        let night = app.buttons["Night"].firstMatch
+        XCTAssertTrue(night.waitForExistence(timeout: 5))
+        XCTAssertNotEqual(night.value as? String, "Selected", "Classic is the default")
+        night.press()
+        app.buttons["Night Pinstripe"].firstMatch.press()
+        XCTAssertEqual(night.value as? String, "Selected")
+        app.terminate()
+        app = launch(seed: 4, reset: false)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings…")
+        XCTAssertTrue(app.buttons["Night"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["Night"].firstMatch.value as? String, "Selected", "remembered")
+        XCTAssertEqual(app.buttons["Night Pinstripe"].firstMatch.value as? String, "Selected", "remembered")
+    }
+
+    /// About, from More: the version and the links to the site, the privacy policy and support.
+    func testAboutShowsTheVersionAndLinks() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "About Solitaire")
+        // iOS exposes static text as its label, macOS as its value.
+        let version = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
+                                                           "Version 1.0", "Version 1.0")).firstMatch
+        XCTAssertTrue(version.waitForExistence(timeout: 5), "the version line")
+        for link in ["One Off Endeavors", "Privacy policy", "Support and feedback"] {
+            XCTAssertTrue(app.descendants(matching: .any)[link].firstMatch.exists, link)
+        }
+    }
+
+    /// Opens More and chooses `item` (a menu on iPhone, a popover on the Mac).
+    private func more(_ app: XCUIApplication, _ item: String) {
+        let button = app.buttons["More"].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.press()
+        let entry = app.buttons[item].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), item)
+        entry.press()
     }
 
     /// A tap on the stock draws; undo puts it back.
