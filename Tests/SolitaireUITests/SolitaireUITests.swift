@@ -38,7 +38,9 @@ final class SolitaireUITests: XCTestCase {
         autoFinish.press()
         XCTAssertTrue(app.staticTexts["12 moves"].waitForExistence(timeout: 5), "twelve auto-finish moves")
         XCTAssertFalse(app.staticTexts["You won!"].waitForExistence(timeout: 3), "the cascade plays uncovered")
-        app.windows.firstMatch.press()                          // skip the cascade
+        // Skip the cascade with a click on the board. (A point, not the window element: on the Mac
+        // XCUITest's click on a window never reaches its content.)
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 5))
         // A new game from the win sheet asks for the draw count, like every other way to start one.
         XCTAssertTrue(app.buttons["New Game: Draw 1"].exists && app.buttons["New Game: Draw 3"].exists)
@@ -257,6 +259,16 @@ final class SolitaireUITests: XCTestCase {
 /// On macOS 27, XCUITest's `tap()` no longer reaches AppKit/SwiftUI controls: "Synthesize event"
 /// takes seconds and the control never acts. `click()` still works but exists only on macOS, so
 /// these pick the right gesture per platform.
+extension XCUICoordinate {
+    func press() {
+        #if os(macOS)
+        click()
+        #else
+        tap()
+        #endif
+    }
+}
+
 extension XCUIElement {
     func press() {
         #if os(macOS)
