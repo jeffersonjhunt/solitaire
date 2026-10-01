@@ -10,6 +10,7 @@ struct ContentView: View {
     /// The win whose cascade has finished; the win sheet waits for it, so the cascade plays uncovered.
     @State private var cascadeFinishedSeed: UInt64?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,16 +46,24 @@ struct ContentView: View {
         }
     }
 
-    /// Shown once per won game, after its cascade (at once under Reduce Motion, which has none);
-    /// closing it leaves the finished board and the cascade's trail (New Game is in the toolbar).
     private var winSheetShown: Binding<Bool> {
         Binding(
             get: {
-                store.state.isWon && dismissedWinSeed != store.state.seed
-                    && (reduceMotion || cascadeFinishedSeed == store.state.seed)
+                Self.showsWinSheet(isWon: store.state.isWon, dismissed: dismissedWinSeed == store.state.seed,
+                                   cascadeFinished: cascadeFinishedSeed == store.state.seed,
+                                   reduceMotion: reduceMotion, voiceOver: voiceOver)
             },
             set: { shown in if !shown { dismissedWinSeed = store.state.seed } }
         )
+    }
+
+    /// The win sheet: once per won game, after its cascade so the cascade plays uncovered — but at
+    /// once under Reduce Motion (there is no cascade) or VoiceOver (the cascade is silent and can't
+    /// be skipped by touch; the sheet is what VoiceOver reads). Closing it leaves the finished board
+    /// and the trail (New Game is in the toolbar).
+    nonisolated static func showsWinSheet(isWon: Bool, dismissed: Bool, cascadeFinished: Bool,
+                                          reduceMotion: Bool, voiceOver: Bool) -> Bool {
+        isWon && !dismissed && (cascadeFinished || reduceMotion || voiceOver)
     }
 
     static var barAtBottom: Bool {

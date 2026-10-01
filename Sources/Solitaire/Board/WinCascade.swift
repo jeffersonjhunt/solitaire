@@ -29,11 +29,11 @@ struct WinCascade: View {
                     context.draw(symbol, at: CGPoint(x: slot.midX, y: slot.midY))
                 }
                 // The trail: older stamps baked into one bitmap, the newest drawn card by card.
-                trail.bake(simulation.stamps, size: size, scale: displayScale,
+                trail.bake(simulation.stamps, size: size, displayScale: displayScale,
                            final: simulation.isFinished)
-                if let image = trail.image {
-                    context.draw(Image(decorative: image, scale: displayScale),
-                                 in: CGRect(origin: .zero, size: size))
+                if let image = trail.image {               // at its own size: never stretched
+                    context.draw(Image(decorative: image, scale: trail.scale),
+                                 in: CGRect(origin: .zero, size: trail.size))
                 }
                 for stamp in simulation.stamps[trail.baked...] {
                     guard let symbol = context.resolveSymbol(id: stamp.cardID) else { continue }
@@ -53,7 +53,16 @@ struct WinCascade: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onFinished() }                          // skip ahead to the win sheet
-        .onAppear { trail.cards = cardImages() }
+        .task {
+            // Usually ready already (the board prepares them once the game can auto-finish).
+            let cards = foundations.flatMap { $0 }
+            let width = layout.metrics.cardWidth
+            await CardImageCache.shared.prepare(cards, width: width, scale: displayScale)
+            if let images = CardImageCache.shared.images(for: cards, width: width, scale: displayScale) {
+                trail.cardScale = displayScale
+                trail.cards = images
+            }
+        }
         .accessibilityHidden(true)
     }
 
@@ -64,17 +73,6 @@ struct WinCascade: View {
             let slot = layout.slot(.foundation(f))
             return (card.id, CGPoint(x: slot.midX, y: slot.midY))
         }
-    }
-
-    /// Each card drawn once, for baking into the trail bitmap.
-    private func cardImages() -> [Int: CGImage] {
-        var images: [Int: CGImage] = [:]
-        for card in foundations.flatMap({ $0 }) {
-            let renderer = ImageRenderer(content: CardView(card: card, width: layout.metrics.cardWidth))
-            renderer.scale = displayScale
-            images[card.id] = renderer.cgImage
-        }
-        return images
     }
 }
 
@@ -161,13 +159,34 @@ final class CascadeSimulation {
 /// each frame is what forced the old cap — and the cap erased the start of the trail.)
 final class TrailBitmap {
     static let batch = 240                         // stamps per bake: about a quarter second's worth
+    /// The bitmap's pixel budget (about 24 MB). A huge window draws its baked trail at a little
+    /// less than full resolution rather than holding 40+ MB; the newest stamps stay crisp.
+    static let maxPixels: CGFloat = 6_000_000
+    /// Every card image, all at once (a missing one would drop its stamps from the trail for good).
     var cards: [Int: CGImage] = [:]
+    /// The scale the card images were drawn at.
+    var cardScale: CGFloat = 1
     private(set) var image: CGImage?
     private(set) var baked = 0
+    /// The board size (points) and pixel scale the bitmap was made for.
+    private(set) var size: CGSize = .zero
+    private(set) var scale: CGFloat = 1
     private var context: CGContext?
 
+    static func bitmapScale(for size: CGSize, displayScale: CGFloat) -> CGFloat {
+        min(displayScale, (maxPixels / max(size.width * size.height, 1)).squareRoot())
+    }
+
     /// Bakes the pending stamps once a batch has built up, or all of them when the cascade ends.
-    func bake(_ stamps: [CascadeSimulation.Stamp], size: CGSize, scale: CGFloat, final: Bool) {
+    /// If the board's size or scale changed (a window resized, or moved to another display), the
+    /// bitmap is rebuilt from every stamp at the new size rather than stretched.
+    func bake(_ stamps: [CascadeSimulation.Stamp], size: CGSize, displayScale: CGFloat, final: Bool) {
+        let scale = Self.bitmapScale(for: size, displayScale: displayScale)
+        if context != nil, size != self.size || scale != self.scale {
+            context = nil
+            image = nil
+            baked = 0
+        }
         let pending = stamps.count - baked
         guard pending > 0, pending >= Self.batch || final, !cards.isEmpty else { return }
         if context == nil {
@@ -180,11 +199,13 @@ final class TrailBitmap {
             ctx.translateBy(x: 0, y: CGFloat(h))
             ctx.scaleBy(x: scale, y: -scale)
             context = ctx
+            self.size = size
+            self.scale = scale
         }
         guard let context else { return }
         for stamp in stamps[baked...] {
             guard let card = cards[stamp.cardID] else { continue }
-            let w = CGFloat(card.width) / scale, h = CGFloat(card.height) / scale
+            let w = CGFloat(card.width) / cardScale, h = CGFloat(card.height) / cardScale
             let rect = CGRect(x: stamp.center.x - w / 2, y: stamp.center.y - h / 2, width: w, height: h)
             // CGContext.draw puts an image's top at the rect's maxY; flip it back locally.
             context.saveGState()
@@ -195,5 +216,41 @@ final class TrailBitmap {
         }
         baked = stamps.count
         image = context.makeImage()
+    }
+}
+
+/// The cascade's card images, drawn a few per frame and ahead of the win: rendering all 52 at the
+/// instant of winning would stall the cascade's first frames. Keeps one set — the current card
+/// width and scale.
+@MainActor final class CardImageCache {
+    static let shared = CardImageCache()
+    private var images: [Int: CGImage] = [:]
+    private var width: CGFloat = 0
+    private var scale: CGFloat = 0
+
+    func prepare(_ cards: [Card], width: CGFloat, scale: CGFloat) async {
+        if width != self.width || scale != self.scale {
+            images = [:]
+            self.width = width
+            self.scale = scale
+        }
+        for card in cards where images[card.id] == nil {
+            let renderer = ImageRenderer(content: CardView(card: card, width: width))
+            renderer.scale = scale
+            images[card.id] = renderer.cgImage
+            try? await Task.sleep(for: .milliseconds(2))     // let a frame through between cards
+            guard width == self.width, scale == self.scale else { return }   // superseded
+        }
+    }
+
+    /// All the cards' images at this width and scale, or nil until every one is ready.
+    func images(for cards: [Card], width: CGFloat, scale: CGFloat) -> [Int: CGImage]? {
+        guard width == self.width, scale == self.scale else { return nil }
+        var out: [Int: CGImage] = [:]
+        for card in cards {
+            guard let image = images[card.id] else { return nil }
+            out[card.id] = image
+        }
+        return out
     }
 }
