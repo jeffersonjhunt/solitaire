@@ -29,16 +29,29 @@ final class SolitaireUITests: XCTestCase {
         return app
     }
 
-    /// Acceptance 5: a game played to a win shows the win sheet with the move count and time.
+    /// Acceptance 5: a game played to a win shows the win sheet with the move count and time — after
+    /// the cascade, which it must not cover; a click on the cascade skips straight to it.
     func testAutoFinishWinsAndShowsTheWinSheet() {
         let app = launch(scenario: "almostWon")
         let autoFinish = app.buttons["Auto-finish"]
         XCTAssertTrue(autoFinish.waitForExistence(timeout: 5), "Auto-finish should be offered")
         autoFinish.press()
-        XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["12 moves"].exists, "twelve auto-finish moves")
+        XCTAssertTrue(app.staticTexts["12 moves"].waitForExistence(timeout: 5), "twelve auto-finish moves")
+        XCTAssertFalse(app.staticTexts["You won!"].waitForExistence(timeout: 3), "the cascade plays uncovered")
+        // Skip the cascade with a click on the board. (A point, not the window element: on the Mac
+        // XCUITest's click on a window never reaches its content.)
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).press()
+        XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 5))
         // A new game from the win sheet asks for the draw count, like every other way to start one.
         XCTAssertTrue(app.buttons["New Game: Draw 1"].exists && app.buttons["New Game: Draw 3"].exists)
+    }
+
+    /// Left alone, the cascade runs to its end and then the win sheet appears.
+    func testWinSheetFollowsTheCascade() {
+        let app = launch(scenario: "almostWon")
+        XCTAssertTrue(app.buttons["Auto-finish"].waitForExistence(timeout: 5))
+        app.buttons["Auto-finish"].press()
+        XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 60), "the cascade should end")
     }
 
     /// Acceptance 6: a king alone at the bottom of a column reaches an empty column by drag, but a
@@ -246,6 +259,16 @@ final class SolitaireUITests: XCTestCase {
 /// On macOS 27, XCUITest's `tap()` no longer reaches AppKit/SwiftUI controls: "Synthesize event"
 /// takes seconds and the control never acts. `click()` still works but exists only on macOS, so
 /// these pick the right gesture per platform.
+extension XCUICoordinate {
+    func press() {
+        #if os(macOS)
+        click()
+        #else
+        tap()
+        #endif
+    }
+}
+
 extension XCUIElement {
     func press() {
         #if os(macOS)

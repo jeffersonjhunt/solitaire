@@ -268,8 +268,7 @@ func worstCaseState() -> GameState {
         (0..<52).map { ($0, CGPoint(x: 400, y: 60)) }
     }
 
-    /// Same trail however often the screen refreshes. Measured over half a second, well under the
-    /// trail cap — a saturated trail would make any two counts equal and prove nothing.
+    /// Same trail however often the screen refreshes.
     @Test func trailDoesNotDependOnFrameRate() {
         func run(fps: Double) -> Int {
             let sim = CascadeSimulation()
@@ -281,7 +280,7 @@ func worstCaseState() -> GameState {
             return sim.stamps.count
         }
         let at60 = run(fps: 60), at120 = run(fps: 120)
-        #expect(at60 > 0 && at120 < CascadeSimulation.maxStamps, "must not saturate (\(at120))")
+        #expect(at60 > 0)
         #expect(at60 == at120)
     }
 
@@ -296,5 +295,123 @@ func worstCaseState() -> GameState {
             frame += 1
         }
         #expect(sim.isFinished, "every card should leave the board")
+    }
+
+    /// The trail is the picture the cascade leaves behind: nothing is ever dropped from it, so the
+    /// start of the trail is still there when the last card leaves.
+    @Test func theTrailIsNeverTrimmed() {
+        let sim = CascadeSimulation()
+        let t0 = Date()
+        var frame = 0, previous = 0
+        var firstStamp: CascadeSimulation.Stamp?
+        while !sim.isFinished && frame < 60 * 120 {
+            sim.advance(to: t0.addingTimeInterval(Double(frame) / 60), launches: launches(),
+                        bounds: CGSize(width: 2560, height: 1000), cardHeight: 100)
+            #expect(sim.stamps.count >= previous)
+            previous = sim.stamps.count
+            if firstStamp == nil { firstStamp = sim.stamps.first }
+            frame += 1
+        }
+        #expect(sim.isFinished)
+        #expect(sim.stamps.count > 1400, "a wide board's trail is long (\(sim.stamps.count))")
+        #expect(sim.stamps.first?.center == firstStamp?.center, "the first stamp is still there")
+    }
+
+    func fullFoundations() -> [[Card]] {
+        [Suit.spades, .hearts, .diamonds, .clubs].map { s in (1...13).map { Card(suit: s, rank: $0, isFaceUp: true) } }
+    }
+
+    @Test func kingsLeaveFirstAndThePilesEmpty() {
+        let f = fullFoundations()
+        let order = CascadeSimulation.launchOrder(f)
+        #expect(order.count == 52 && Set(order.map(\.id)).count == 52)
+        #expect(order.prefix(4).allSatisfy { $0.rank == 13 } && order.last?.rank == 1)
+        #expect(CascadeSimulation.remainingTops(f, launched: 0).map { $0?.rank } == [13, 13, 13, 13])
+        // Four kings and the first queen gone: the first pile shows its jack, the others a queen.
+        #expect(CascadeSimulation.remainingTops(f, launched: 5).map { $0?.rank } == [11, 12, 12, 12])
+        #expect(CascadeSimulation.remainingTops(f, launched: 52).allSatisfy { $0 == nil })
+    }
+
+    /// A 4 × 4 test card: red on top, transparent underneath, so orientation shows.
+    func topHalfRed() -> CGImage {
+        let ctx = CGContext(data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 2, width: 4, height: 2))        // CG y-up: rows 2...3 are the top
+        return ctx.makeImage()!
+    }
+
+    /// Red at (x, y) in the baked image (top-left origin).
+    func isRed(_ image: CGImage, _ x: Int, _ y: Int) -> Bool {
+        let data = image.dataProvider!.data! as Data
+        let i = y * image.bytesPerRow + x * 4
+        return data[i] > 200 && data[i + 3] > 200
+    }
+
+    @Test func trailBakesInBatchesAndTheRightWayUp() {
+        let trail = TrailBitmap()
+        trail.cards = [7: topHalfRed()]
+        let stamps = [CascadeSimulation.Stamp(cardID: 7, center: CGPoint(x: 20, y: 30))]
+        trail.bake(stamps, size: CGSize(width: 100, height: 100), displayScale: 1, final: false)
+        #expect(trail.baked == 0 && trail.image == nil, "one stamp is not a batch yet")
+        trail.bake(stamps, size: CGSize(width: 100, height: 100), displayScale: 1, final: true)
+        let image = try! #require(trail.image)
+        #expect(trail.baked == 1)
+        #expect(isRed(image, 20, 29), "the card's top half is above its centre")
+        #expect(!isRed(image, 20, 31), "and its bottom half is not red")
+        #expect(!isRed(image, 80, 80), "nothing drawn elsewhere")
+    }
+
+    /// Resized mid-cascade: the bitmap is rebuilt at the new size from every stamp, not stretched.
+    @Test func trailRebuildsAtANewSize() throws {
+        let trail = TrailBitmap()
+        trail.cards = [7: topHalfRed()]
+        let stamps = [CascadeSimulation.Stamp(cardID: 7, center: CGPoint(x: 20, y: 30))]
+        trail.bake(stamps, size: CGSize(width: 100, height: 100), displayScale: 1, final: true)
+        trail.bake(stamps, size: CGSize(width: 200, height: 150), displayScale: 1, final: true)
+        let image = try #require(trail.image)
+        #expect(image.width == 200 && image.height == 150 && trail.size == CGSize(width: 200, height: 150))
+        #expect(trail.baked == 1)
+        #expect(isRed(image, 20, 29), "the stamp is where it was, at its own size")
+    }
+
+    /// A huge board's bitmap stays within its pixel budget; a normal one is full resolution.
+    @Test func trailBitmapIsCappedOnHugeBoards() {
+        #expect(TrailBitmap.bitmapScale(for: CGSize(width: 1000, height: 760), displayScale: 2) == 2)
+        let huge = CGSize(width: 2560, height: 1300)
+        let s = TrailBitmap.bitmapScale(for: huge, displayScale: 2)
+        #expect(s < 2 && huge.width * s * huge.height * s <= TrailBitmap.maxPixels + 1)
+    }
+
+    /// Card images missing: nothing is baked (and nothing marked baked), so no stamp is lost.
+    @Test func trailWaitsForTheCardImages() {
+        let trail = TrailBitmap()
+        let stamps = [CascadeSimulation.Stamp(cardID: 7, center: CGPoint(x: 20, y: 30))]
+        trail.bake(stamps, size: CGSize(width: 100, height: 100), displayScale: 1, final: true)
+        #expect(trail.baked == 0 && trail.image == nil)
+    }
+
+    @MainActor @Test func cardImagesArePreparedAheadAndKeptPerSize() async {
+        let cards = fullFoundations().flatMap { $0 }
+        let cache = CardImageCache()
+        #expect(cache.images(for: cards, width: 60, scale: 2) == nil)
+        await cache.prepare(cards, width: 60, scale: 2)
+        #expect(cache.images(for: cards, width: 60, scale: 2)?.count == 52)
+        #expect(cache.images(for: cards, width: 80, scale: 2) == nil, "another size is another set")
+    }
+
+    @Test(arguments: [
+        // isWon, dismissed, cascadeFinished, reduceMotion, voiceOver -> shown
+        (true, false, false, false, false, false),   // the cascade plays uncovered
+        (true, false, true, false, false, true),     // ...then the sheet
+        (true, false, false, true, false, true),     // Reduce Motion: no cascade, sheet at once
+        (true, false, false, false, true, true),     // VoiceOver: sheet at once
+        (true, true, true, false, false, false),     // closed: stays closed
+        (false, false, true, true, true, false),     // not won
+    ])
+    func winSheetTiming(_ c: (Bool, Bool, Bool, Bool, Bool, Bool)) {
+        #expect(ContentView.showsWinSheet(isWon: c.0, dismissed: c.1, cascadeFinished: c.2,
+                                          reduceMotion: c.3, voiceOver: c.4) == c.5)
     }
 }

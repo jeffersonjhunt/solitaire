@@ -12,7 +12,10 @@ import SolitaireEngine
 /// macOS double-click acts once, like a tap; hovering highlights the card under the pointer.
 struct BoardView: View {
     let store: GameStore
+    /// Called when the win cascade has finished (or was clicked to skip it).
+    var onCascadeFinished: () -> Void = {}
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.displayScale) private var displayScale
     @State private var dragTranslation: CGSize = .zero
     /// True while a drag gesture is live; resets on its own when the system cancels the gesture
     /// (which skips `onEnded`), so a cancelled drag still ends and springs home.
@@ -36,14 +39,27 @@ struct BoardView: View {
                 outlines(layout)
                 ForEach(layout.placements) { p in
                     card(p, layout)
+                        // During the cascade the cascade draws the foundations, emptying them as
+                        // the cards fly; the board's own copies stay for VoiceOver, unseen.
+                        .opacity(cascading && p.isOnFoundation ? 0 : 1)
                 }
-                if store.state.isWon && !reduceMotion {
-                    WinCascade(foundations: store.state.foundations, layout: layout)
+                if cascading {
+                    WinCascade(foundations: store.state.foundations, layout: layout,
+                               onFinished: onCascadeFinished)
                         .id(store.state.seed)               // a fresh cascade for every win
                         .zIndex(4000)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+            // Draw the cascade's card images ahead of the win, a few per frame, once it is in reach.
+            .task(id: CascadePrep(near: store.canAutoFinish || store.state.isWon,
+                                  width: metrics.cardWidth, scale: displayScale)) {
+                guard !reduceMotion, store.canAutoFinish || store.state.isWon else { return }
+                let s = store.state
+                await CardImageCache.shared.prepare(s.stock + s.waste + s.foundations.flatMap { $0 }
+                                                    + s.tableau.flatMap { $0 },
+                                                    width: metrics.cardWidth, scale: displayScale)
+            }
             .coordinateSpace(.named(Self.space))
             .animation(reduceMotion ? nil : Self.moveAnimation, value: store.state)
             // However a drag ends — dropped, refused, cancelled by the system, or cut short by a
@@ -58,6 +74,11 @@ struct BoardView: View {
             }
         }
     }
+
+    private struct CascadePrep: Equatable { let near: Bool; let width: CGFloat; let scale: CGFloat }
+
+    /// The win cascade runs (Reduce Motion: there is none).
+    private var cascading: Bool { store.state.isWon && !reduceMotion }
 
     private func card(_ p: CardPlacement, _ layout: BoardLayout) -> some View {
         let metrics = layout.metrics

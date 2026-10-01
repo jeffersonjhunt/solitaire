@@ -7,11 +7,15 @@ struct ContentView: View {
     let store: GameStore
     let ui: AppUI
     @State private var dismissedWinSeed: UInt64?
+    /// The win whose cascade has finished; the win sheet waits for it, so the cascade plays uncovered.
+    @State private var cascadeFinishedSeed: UInt64?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     var body: some View {
         VStack(spacing: 0) {
             if !Self.barAtBottom { GameBar(store: store, ui: ui) }
-            BoardView(store: store)                     // draws the win cascade itself
+            BoardView(store: store) { cascadeFinishedSeed = store.state.seed }   // draws the win cascade itself
                 .padding(.horizontal, 4)
             if Self.barAtBottom { GameBar(store: store, ui: ui) }
         }
@@ -42,12 +46,24 @@ struct ContentView: View {
         }
     }
 
-    /// Shown once per won game; closing it leaves the finished board (New Game is in the toolbar).
     private var winSheetShown: Binding<Bool> {
         Binding(
-            get: { store.state.isWon && dismissedWinSeed != store.state.seed },
+            get: {
+                Self.showsWinSheet(isWon: store.state.isWon, dismissed: dismissedWinSeed == store.state.seed,
+                                   cascadeFinished: cascadeFinishedSeed == store.state.seed,
+                                   reduceMotion: reduceMotion, voiceOver: voiceOver)
+            },
             set: { shown in if !shown { dismissedWinSeed = store.state.seed } }
         )
+    }
+
+    /// The win sheet: once per won game, after its cascade so the cascade plays uncovered — but at
+    /// once under Reduce Motion (there is no cascade) or VoiceOver (the cascade is silent and can't
+    /// be skipped by touch; the sheet is what VoiceOver reads). Closing it leaves the finished board
+    /// and the trail (New Game is in the toolbar).
+    nonisolated static func showsWinSheet(isWon: Bool, dismissed: Bool, cascadeFinished: Bool,
+                                          reduceMotion: Bool, voiceOver: Bool) -> Bool {
+        isWon && !dismissed && (cascadeFinished || reduceMotion || voiceOver)
     }
 
     static var barAtBottom: Bool {
