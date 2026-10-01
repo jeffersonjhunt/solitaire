@@ -12,7 +12,9 @@ import SolitaireEngine
     @Test(arguments: CardFaceStyle.allCases)
     func indexFitsTheNarrowestFannedStrip(_ face: CardFaceStyle) {
         let strip = BoardMetrics.readableFanRatio * BoardMetrics.aspect
-        let bottom = FaceSpec.of(face).indexBottom()
+        let spec = FaceSpec.of(face)
+        #expect(spec.capHeight > spec.rankSize * 0.5, "\(face): cap height was measured (not 0)")
+        let bottom = spec.indexBottom()
         #expect(bottom <= strip, "\(face): index reaches \(bottom) of the card width; the strip is \(strip)")
     }
 
@@ -68,7 +70,8 @@ import SolitaireEngine
         #expect(points.contains { near(pixel(down, style, at: $0), panel, 30) })
     }
 
-    /// A saved value the app doesn't know (an older or newer version's) reads as no choice.
+    /// A saved value the app doesn't know reads as no choice (the saved-setting path itself is
+    /// covered by the UI test testUnknownSavedCardStyleFallsBackToTheDefault).
     @Test func unknownSavedStylesFallBack() {
         #expect(CardFaceStyle(rawValue: "fourColour") == nil)
         #expect(CardBackStyle(rawValue: "tartan") == nil)

@@ -45,7 +45,7 @@ struct SolitaireApp: App {
 
         Settings {
             SettingsView(store: store)
-                .frame(width: 440, height: 720)
+                .frame(width: 440, height: 600)
         }
 
         Window("About Solitaire", id: AboutCommands.windowID) {

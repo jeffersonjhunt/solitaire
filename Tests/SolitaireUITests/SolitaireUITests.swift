@@ -14,7 +14,10 @@ final class SolitaireUITests: XCTestCase {
 
     /// Launches the app with a Debug scenario or seed, passed in the environment (see
     /// UITestScenario). `reset: false` keeps the previous launch's save — for relaunch tests.
-    private func launch(scenario: String? = nil, seed: UInt64? = nil, reset: Bool = true) -> XCUIApplication {
+    /// `arguments` are extra launch arguments, e.g. `["-cardFace", "night"]` to put a value in the
+    /// arguments domain, which every UserDefaults read sees first.
+    private func launch(scenario: String? = nil, seed: UInt64? = nil, reset: Bool = true,
+                        arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["SOLITAIRE_SAVE_FILE"] = isolation
         app.launchEnvironment["SOLITAIRE_DEFAULTS_SUITE"] = isolation
@@ -22,7 +25,7 @@ final class SolitaireUITests: XCTestCase {
         // Ignore saved window state, as Xcode does for the unit-test host. A run that quit with no
         // window open saves "no windows", and XCUITest's launch (unlike Finder or the Dock) does not
         // send the "open application" event that would open one anyway — the app came up windowless.
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"] + arguments
         if let scenario { app.launchEnvironment["SOLITAIRE_SCENARIO"] = scenario }
         if let seed { app.launchEnvironment["SOLITAIRE_SEED"] = String(seed) }
         app.launch()
@@ -249,17 +252,28 @@ final class SolitaireUITests: XCTestCase {
         more(app, "Settings…")
         let night = app.buttons["Night"].firstMatch
         XCTAssertTrue(night.waitForExistence(timeout: 5))
-        XCTAssertNotEqual(night.value as? String, "Selected", "Classic is the default")
+        XCTAssertFalse(night.isSelected, "Classic is the default")
         night.press()
         app.buttons["Night Pinstripe"].firstMatch.press()
-        XCTAssertEqual(night.value as? String, "Selected")
+        XCTAssertTrue(night.isSelected)
         app.terminate()
         app = launch(seed: 4, reset: false)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
         more(app, "Settings…")
         XCTAssertTrue(app.buttons["Night"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["Night"].firstMatch.value as? String, "Selected", "remembered")
-        XCTAssertEqual(app.buttons["Night Pinstripe"].firstMatch.value as? String, "Selected", "remembered")
+        XCTAssertTrue(app.buttons["Night"].firstMatch.isSelected, "remembered")
+        XCTAssertTrue(app.buttons["Night Pinstripe"].firstMatch.isSelected, "remembered")
+    }
+
+    /// A saved face or back this version doesn't know (from an older or newer one) reads as the
+    /// default rather than breaking the cards or Settings.
+    func testUnknownSavedCardStyleFallsBackToTheDefault() {
+        let app = launch(seed: 4, arguments: ["-cardFace", "tartan", "-cardBack", "plaid"])
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings…")
+        XCTAssertTrue(app.buttons["Classic"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Classic"].firstMatch.isSelected, "face falls back to Classic")
+        XCTAssertTrue(app.buttons["Classic Blue"].firstMatch.isSelected, "back falls back to Classic Blue")
     }
 
     /// About, from More: the version and the links to the site, the privacy policy and support.

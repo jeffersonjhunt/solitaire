@@ -92,7 +92,6 @@ where Style.AllCases: RandomAccessCollection, Style: TitledStyle {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(style.title)
                 .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-                .accessibilityValue(selected ? "Selected" : "")
             }
         }
         .padding(.vertical, 4)

@@ -79,7 +79,7 @@ private struct CardFace: View {
         let spec = FaceSpec.of(style.face)
         let shape = RoundedRectangle(cornerRadius: width * 0.09, style: .continuous)
         let ink = card.suit.isRed ? spec.red : spec.black
-        let cap = CardFonts.capHeight(size: width * spec.rankSize, weight: spec.rankWeight, design: spec.rankDesign)
+        let cap = width * spec.capHeight
         shape
             .fill(spec.paper)
             .overlay {
@@ -190,17 +190,17 @@ private struct DiamondGrid: Shape {
     }
 }
 
-/// Parallel diagonal lines, one direction only (rising to the left), filling the rect.
+/// Parallel diagonal lines, one direction only (rising to the right, /), filling the rect.
 private struct Pinstripe: Shape {
     let spacing: CGFloat
 
     func path(in rect: CGRect) -> Path {
         var p = Path()
         let step = max(spacing, 2)
-        var x = rect.minX - rect.height
-        while x < rect.maxX {
+        var x = rect.minX
+        while x < rect.maxX + rect.height {
             p.move(to: CGPoint(x: x, y: rect.minY))
-            p.addLine(to: CGPoint(x: x + rect.height, y: rect.maxY))
+            p.addLine(to: CGPoint(x: x - rect.height, y: rect.maxY))
             x += step
         }
         return p

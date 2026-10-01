@@ -57,6 +57,7 @@ extension Color {
 struct FaceSpec: Sendable {
     enum Pip: Sendable { case corner, center }
 
+    let face: CardFaceStyle
     let rankSize: CGFloat
     let rankWeight: Font.Weight
     let rankDesign: Font.Design
@@ -78,29 +79,37 @@ struct FaceSpec: Sendable {
     static func of(_ face: CardFaceStyle) -> FaceSpec {
         switch face {
         case .classic:
-            FaceSpec(rankSize: 0.36, rankWeight: .semibold, rankDesign: .rounded, suitSize: 0.28, pipSize: 0.62,
+            FaceSpec(face: .classic, rankSize: 0.36, rankWeight: .semibold, rankDesign: .rounded, suitSize: 0.28, pipSize: 0.62,
                      pip: .corner, paper: Color("CardFace"), border: .black.opacity(0.25),
                      red: Color("CardRed"), black: Color("CardBlack"), frame: nil)
         case .bigIndex:
-            FaceSpec(rankSize: 0.37, rankWeight: .black, rankDesign: .default, suitSize: 0.30, pipSize: 0.66,
+            FaceSpec(face: .bigIndex, rankSize: 0.37, rankWeight: .black, rankDesign: .default, suitSize: 0.30, pipSize: 0.66,
                      pip: .center, paper: .white, border: .black.opacity(0.25),
                      red: Color(hex: 0xD0021B), black: .black, frame: nil)
         case .vintage:
-            FaceSpec(rankSize: 0.36, rankWeight: .bold, rankDesign: .serif, suitSize: 0.28, pipSize: 0.6,
+            FaceSpec(face: .vintage, rankSize: 0.36, rankWeight: .bold, rankDesign: .serif, suitSize: 0.28, pipSize: 0.6,
                      pip: .center, paper: Color(hex: 0xFBF4E4), border: Color(hex: 0x503C1E, opacity: 0.35),
                      red: Color(hex: 0x9E1B32), black: Color(hex: 0x1F1F1F), frame: Color(hex: 0x785A28, opacity: 0.45))
         case .night:
-            FaceSpec(rankSize: 0.36, rankWeight: .semibold, rankDesign: .rounded, suitSize: 0.28, pipSize: 0.62,
+            FaceSpec(face: .night, rankSize: 0.36, rankWeight: .semibold, rankDesign: .rounded, suitSize: 0.28, pipSize: 0.62,
                      pip: .corner, paper: Color(hex: 0x262626), border: Color(hex: 0x3A3A3A),
                      red: Color(hex: 0xFF7A7A), black: Color(hex: 0xEDEAE4), frame: nil)
         }
     }
 
+    /// The rank's cap height as a fraction of the card width, from this platform's font. Measured
+    /// once per face: cap height scales with size, and cards redraw often (52 a frame in a drag).
+    var capHeight: CGFloat { Self.capHeights[self.face] ?? 0 }
+
     /// Where the index's baseline falls, as a fraction of the card width: its top inset plus the
     /// rank font's real cap height on this platform.
-    func indexBottom() -> CGFloat {
-        Self.indexTop + CardFonts.capHeight(size: rankSize, weight: rankWeight, design: rankDesign)
-    }
+    func indexBottom() -> CGFloat { Self.indexTop + capHeight }
+
+    private static let capHeights: [CardFaceStyle: CGFloat] = Dictionary(uniqueKeysWithValues:
+        CardFaceStyle.allCases.map { face in
+            let s = of(face)
+            return (face, CardFonts.capHeight(size: s.rankSize, weight: s.rankWeight, design: s.rankDesign))
+        })
 }
 
 /// How a back draws: a card of `paper` with a patterned panel inset by 7 % of the width.
