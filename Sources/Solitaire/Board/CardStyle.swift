@@ -22,7 +22,7 @@ enum CardFaceStyle: String, CaseIterable, Identifiable, Sendable {
 
 /// The card backs the player can choose (spec "Card styles").
 enum CardBackStyle: String, CaseIterable, Identifiable, Sendable {
-    case classicBlue, burntOrange, racingGreen, nightPinstripe
+    case classicBlue, burntOrange, racingGreen, artDeco
 
     var id: String { rawValue }
     var title: String {
@@ -30,7 +30,7 @@ enum CardBackStyle: String, CaseIterable, Identifiable, Sendable {
         case .classicBlue: "Classic Blue"
         case .burntOrange: "Burnt Orange"
         case .racingGreen: "Racing Green"
-        case .nightPinstripe: "Night Pinstripe"
+        case .artDeco: "Art Deco"
         }
     }
 }
@@ -70,10 +70,11 @@ struct FaceSpec: Sendable {
     let black: Color
     let frame: Color?
 
-    /// The corner index's capital tops sit this far below the card's top edge, so the whole index
-    /// stays inside the narrowest fanned strip (0.2 × card height; decision D1). Text's built-in
-    /// space above the capitals would otherwise push it ~0.09 × width further down.
-    static let indexTop: CGFloat = 0.015
+    /// The corner index's capital tops sit this far below the card's top edge — the same margin
+    /// as at its left — and the whole index stays inside the narrowest fanned strip
+    /// (`BoardMetrics.readableFanRatio`; decision D1). Placing it by its capitals matters: text's
+    /// built-in space above them would otherwise push it ~0.09 × width further down.
+    static let indexTop: CGFloat = 0.07
     static let indexLeading: CGFloat = 0.07
 
     static func of(_ face: CardFaceStyle) -> FaceSpec {
@@ -114,7 +115,7 @@ struct FaceSpec: Sendable {
 
 /// How a back draws: a card of `paper` with a patterned panel inset by 7 % of the width.
 struct BackSpec: Sendable {
-    enum Pattern: Sendable { case lattice, diamonds, pinstripe }
+    enum Pattern: Sendable { case lattice, diamonds, rays }
 
     let paper: Color
     let panel: Color
@@ -133,9 +134,9 @@ struct BackSpec: Sendable {
         case .racingGreen:
             BackSpec(paper: Color(hex: 0xF7F1E3), panel: Color(hex: 0x1F5E3A), pattern: .diamonds,
                      ink: Color(hex: 0xF7F1E3, opacity: 0.35), frame: Color(hex: 0xF7F1E3, opacity: 0.8))
-        case .nightPinstripe:
-            BackSpec(paper: Color(hex: 0x1E1E1E), panel: Color(hex: 0x141414), pattern: .pinstripe,
-                     ink: Color(hex: 0xCC5500, opacity: 0.55), frame: Color(hex: 0xCC5500))
+        case .artDeco:
+            BackSpec(paper: Color(hex: 0xF7F1E3), panel: Color(hex: 0x1B2A4A), pattern: .rays,
+                     ink: Color(hex: 0xC9A227, opacity: 0.75), frame: Color(hex: 0xC9A227))
         }
     }
 }

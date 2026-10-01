@@ -254,7 +254,7 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(night.waitForExistence(timeout: 5))
         XCTAssertFalse(night.isSelected, "Classic is the default")
         night.press()
-        app.buttons["Night Pinstripe"].firstMatch.press()
+        app.buttons["Art Deco"].firstMatch.press()
         XCTAssertTrue(night.isSelected)
         app.terminate()
         app = launch(seed: 4, reset: false)
@@ -262,7 +262,7 @@ final class SolitaireUITests: XCTestCase {
         more(app, "Settings…")
         XCTAssertTrue(app.buttons["Night"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Night"].firstMatch.isSelected, "remembered")
-        XCTAssertTrue(app.buttons["Night Pinstripe"].firstMatch.isSelected, "remembered")
+        XCTAssertTrue(app.buttons["Art Deco"].firstMatch.isSelected, "remembered")
     }
 
     /// A saved face or back this version doesn't know (from an older or newer one) reads as the

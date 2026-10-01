@@ -23,8 +23,10 @@ struct BoardMetrics: Equatable, Sendable {
     /// under a nine-card run (K→5), with its face-up fan no smaller than `readableFanRatio`.
     /// Fans are the steps between cards: 6 below the face-down cards, 8 between the 9 face-up.
     static let readableColumn = (faceDownCards: 6, faceUpCards: 9)
-    /// A face-up fan of 0.2 × card height still shows each card's rank and suit.
-    static let readableFanRatio: CGFloat = 0.2
+    /// A face-up fan of 0.24 × card height (0.336 × width) still shows each card's whole corner
+    /// index, with a 0.07 × width margin above it (decision 2026-10-01; it was 0.2 before the
+    /// index had a margin).
+    static let readableFanRatio: CGFloat = 0.24
 
     let size: CGSize
     let gap: CGFloat

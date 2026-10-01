@@ -6,7 +6,7 @@ import SolitaireEngine
 /// Spec "Card styles": every face and back draws, stays readable when fanned, and keeps red and
 /// black apart; an unknown saved choice falls back to the default.
 @MainActor @Suite struct CardStyles {
-    /// Decision D1: a face-up card under another shows only its top 0.2 × card height (0.28 × card
+    /// Decision D1: a face-up card under another shows only its top 0.24 × card height (0.336 × card
     /// width). The index's baseline — its capitals' tops plus their real height in this platform's
     /// font — has to fall inside that strip, for every face.
     @Test(arguments: CardFaceStyle.allCases)
@@ -61,7 +61,7 @@ import SolitaireEngine
     }
 
     /// Each back paints its panel (sampled near the panel's corner, between pattern lines).
-    @Test(arguments: [(CardBackStyle.burntOrange, UInt32(0xCC5500)), (.racingGreen, 0x1F5E3A), (.nightPinstripe, 0x141414)])
+    @Test(arguments: [(CardBackStyle.burntOrange, UInt32(0xCC5500)), (.racingGreen, 0x1F5E3A), (.artDeco, 0x1B2A4A)])
     func backsPaintTheirPanel(_ back: CardBackStyle, _ panel: UInt32) {
         let down = Card(suit: .spades, rank: 1, isFaceUp: false)
         let style = CardStyle(back: back)

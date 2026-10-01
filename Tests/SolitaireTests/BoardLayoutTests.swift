@@ -446,7 +446,7 @@ func worstCaseState() -> GameState {
         await cache.prepare(cards, width: 60, scale: 2, style: style)
         #expect(cache.images(for: cards, width: 60, scale: 2, style: style)?.count == 52)
         #expect(cache.images(for: cards, width: 80, scale: 2, style: style) == nil, "another size is another set")
-        #expect(cache.images(for: cards, width: 60, scale: 2, style: CardStyle(face: .night, back: .nightPinstripe)) == nil,
+        #expect(cache.images(for: cards, width: 60, scale: 2, style: CardStyle(face: .night, back: .artDeco)) == nil,
                 "another card style is another set")
     }
 

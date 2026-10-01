@@ -157,8 +157,8 @@ private struct CardBack: View {
                 .stroke(spec.ink, lineWidth: max(width * 0.02, 0.5))
         case .diamonds:
             DiamondGrid(spacing: width * 0.1).fill(spec.ink)
-        case .pinstripe:
-            Pinstripe(spacing: width * 0.05).stroke(spec.ink, lineWidth: max(width * 0.008, 0.5))
+        case .rays:
+            SunRays().fill(spec.ink)
         }
     }
 }
@@ -190,18 +190,20 @@ private struct DiamondGrid: Shape {
     }
 }
 
-/// Parallel diagonal lines, one direction only (rising to the right, /), filling the rect.
-private struct Pinstripe: Shape {
-    let spacing: CGFloat
-
+/// Rays fanning up from the middle of the bottom edge: 4° wide, every 12°, from the left
+/// horizontal round to the right, reaching past the rect's corners.
+private struct SunRays: Shape {
     func path(in rect: CGRect) -> Path {
         var p = Path()
-        let step = max(spacing, 2)
-        var x = rect.minX
-        while x < rect.maxX + rect.height {
-            p.move(to: CGPoint(x: x, y: rect.minY))
-            p.addLine(to: CGPoint(x: x - rect.height, y: rect.maxY))
-            x += step
+        let centre = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = hypot(rect.width, rect.height)
+        var angle = 180.0
+        while angle < 360 {
+            p.move(to: centre)
+            p.addArc(center: centre, radius: radius, startAngle: .degrees(angle),
+                     endAngle: .degrees(angle + 4), clockwise: false)
+            p.closeSubpath()
+            angle += 12
         }
         return p
     }
