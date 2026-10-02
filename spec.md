@@ -84,6 +84,7 @@ struct GameState: Codable, Sendable {
     var isWon: Bool
     var seed: UInt64           // the shuffle seed, for replay and tests
     var redeals: Int           // times the waste was turned back over (passes = redeals + 1)
+    var isHardCore: Bool       // Hard Core: passes limited (see "Hard Core")
 }
 ```
 
@@ -226,6 +227,24 @@ Rules every style keeps:
   is a choice, not an automatic mode.
 - **Live:** changing a face or back restyles every card at once, including the game in progress.
 
+## Hard Core
+
+A harder game with limited passes through the deck: **one in Draw 1** (no redeal at all) and
+**three in Draw 3** (two redeals). It is a property of the deal, like the draw mode, saved with the
+game (a save without it is a normal game).
+
+- **Turning it on or off** is the **Hard Core** switch in Settings ▸ Game, which shows the current
+  game's mode. Changing it deals a new game in the other mode — asked first when a game is in
+  progress ("Turn on Hard Core?" / "Turn off Hard Core?", label HARD CORE; **Start Hard Core** /
+  **Start New Game** and **Cancel**), unless "Ask before ending a game" is off. Settings closes
+  first so the question shows over the game; Cancel leaves the game and the switch as they were.
+  New Game, the draw chip and the win card keep the current game's Hard Core mode.
+- **On the table:** the draw chip reads **DRAW 1 · HC** (VoiceOver: "Draw one, Hard Core"), and the
+  win card's label **DRAW 1 · HARD CORE**. When the passes are used up — stock empty, waste not —
+  the stock's outline shows ✕ instead of the redeal arrow and tapping it does nothing (VoiceOver:
+  "Stock, empty. No passes left"). Undo still works.
+- A saved Hard Core game with more passes than its limit is damaged and is not resumed.
+
 ## Settings, About and the More menu
 
 **More** (the fourth button of the bottom bar) opens a dark card of tiles on every platform (spec
@@ -238,7 +257,8 @@ the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ Abo
 
 **Settings** — a sheet on iPhone and iPad, the Settings window on the Mac:
 
-- **Game:** resume the game in progress at launch, and **Draw pile on the right** (off by default:
+- **Game:** resume the game in progress at launch, **Hard Core** (see "Hard Core"; shows the current
+  game's mode and changing it deals a new game), and **Draw pile on the right** (off by default:
   the stock and waste sit on the left). Turning it on mirrors the top row at once, the game in
   progress included; cards that are moving finish where the new layout puts them. Then **Ask
   before ending a game** (on by default; see "New games and the draw mode"). (The draw mode is not
@@ -271,8 +291,8 @@ game in progress is replaced without a question too: every way of starting a new
 - **The win card** offers New Game in the same mode and the other mode — the game is over, so
   nothing is asked.
 
-The mode of the last deal is remembered and used for the next New Game and the next launch's
-fresh deal. Cancel leaves the game, its mode and its timer untouched. Asking stops auto-finish
+The mode of the last deal — draw count and Hard Core — is remembered and used for the next New
+Game and the next launch's fresh deal. Cancel leaves the game, its mode and its timer untouched. Asking stops auto-finish
 where it is, so a game cannot be won behind the question; Finish is offered again after Cancel.
 
 **About** — a sheet on iPhone and iPad, its own window on the Mac (replacing the standard About
