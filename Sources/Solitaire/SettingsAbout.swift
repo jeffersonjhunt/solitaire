@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var face = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var back = CardBackStyle.classicBlue
     @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
+    @AppStorage(AppSettings.askBeforeEndingGameKey, store: AppSettings.defaults) private var askBeforeEndingGame = true
 
     private static let previewAce = Card(suit: .spades, rank: 1, isFaceUp: true)
     private static let previewKing = Card(suit: .hearts, rank: 13, isFaceUp: true)
@@ -41,6 +42,10 @@ struct SettingsView: View {
                     get: { drawPileSide == .right },
                     set: { drawPileSide = $0 ? .right : .left }))
                     .accessibilityLabel("Draw pile on the right")
+                    .tint(TableColors.accent)
+                Toggle("Ask before ending a game", isOn: $askBeforeEndingGame)
+                    .accessibilityLabel("Ask before ending a game")
+                    .accessibilityHint("Asks before New Game or the draw switch replaces a game in progress")
                     .tint(TableColors.accent)
             }
             Section("Card face") {

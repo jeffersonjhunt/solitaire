@@ -114,6 +114,15 @@ enum AppSettings {
     static let cardBackKey = "cardBack"
     /// Which side the draw pile sits on ("left" / "right"; spec "Top row"); unknown reads as left.
     static let drawPileSideKey = "drawPileSide"
+    /// Whether a game in progress is asked about before a new deal replaces it (spec "New games
+    /// and the draw mode"); unset or not a Bool reads as yes.
+    static let askBeforeEndingGameKey = "askBeforeEndingGame"
+
+    static var askBeforeEndingGame: Bool { askBeforeEndingGame(in: defaults) }
+
+    static func askBeforeEndingGame(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: askBeforeEndingGameKey) as? Bool ?? true
+    }
 
     static var defaults: UserDefaults {
         #if DEBUG
@@ -179,6 +188,9 @@ final class AppUI {
     var showingAbout = false
     /// A new deal waiting for the player to confirm losing the game in progress.
     var pendingNewGame: NewGameRequest?
+    /// Whether to ask before a new deal replaces a game in progress (the Settings switch; tests
+    /// substitute their own).
+    @ObservationIgnored var asksBeforeEndingGame: () -> Bool = { AppSettings.askBeforeEndingGame }
     /// The win card is on screen (set by ContentView, which decides when it shows).
     var showingWinCard = false
     /// The More card is open.

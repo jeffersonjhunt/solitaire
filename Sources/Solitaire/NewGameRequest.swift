@@ -19,11 +19,12 @@ struct NewGameRequest: Equatable {
 
 extension AppUI {
     /// Deals a new game — in `drawCount`, or the current game's mode — at once, unless that would
-    /// lose a game in progress; then it only asks (`pendingNewGame`), and the alert deals or not.
-    /// Asking stops auto-finish, so the game cannot be won behind the question.
+    /// lose a game in progress and the player wants to be asked (Settings ▸ Ask before ending a
+    /// game); then it only asks (`pendingNewGame`), and the question card deals or not. Asking
+    /// stops auto-finish, so the game cannot be won behind the question.
     func requestNewGame(drawCount: Int? = nil, store: GameStore) {
         let count = GameStore.validDrawCount(drawCount ?? store.state.drawCount)
-        guard store.isInProgress else {
+        guard store.isInProgress, asksBeforeEndingGame() else {
             pendingNewGame = nil
             store.newGame(drawCount: count)
             return

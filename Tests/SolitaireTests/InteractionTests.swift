@@ -123,6 +123,29 @@ import SolitaireEngine
         #expect(store.canAutoFinish, "Finish is offered again")
     }
 
+    /// Settings ▸ Ask before ending a game off: a game in progress is replaced at once too.
+    @Test func withAskingOffAGameInProgressIsReplacedAtOnce() {
+        let store = makeStore(drawCount: 1)
+        let ui = AppUI()
+        ui.asksBeforeEndingGame = { false }
+        store.tapStock()
+        #expect(store.isInProgress)
+        ui.requestNewGame(drawCount: 3, store: store)
+        #expect(ui.pendingNewGame == nil && store.state.drawCount == 3 && store.state.moveCount == 0)
+    }
+
+    /// Asking is the default: unset, or anything that isn't a yes/no, reads as yes.
+    @Test func askingIsTheDefault() throws {
+        let name = "ask-before-ending-\(UUID().uuidString)"
+        let d = try #require(UserDefaults(suiteName: name))
+        defer { d.removePersistentDomain(forName: name) }
+        #expect(AppSettings.askBeforeEndingGame(in: d), "unset")
+        d.set("sometimes", forKey: AppSettings.askBeforeEndingGameKey)
+        #expect(AppSettings.askBeforeEndingGame(in: d), "not a Bool")
+        d.set(false, forKey: AppSettings.askBeforeEndingGameKey)
+        #expect(!AppSettings.askBeforeEndingGame(in: d), "turned off")
+    }
+
     @Test func anInvalidCountBecomesDrawOne() {
         let store = makeStore(drawCount: 3)
         AppUI().requestNewGame(drawCount: 7, store: store)

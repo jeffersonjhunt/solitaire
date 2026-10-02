@@ -228,6 +228,34 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5), "confirmed: a new deal")
     }
 
+    /// Settings ▸ Ask before ending a game, turned off: New Game mid-game deals at once, and the
+    /// choice survives a relaunch.
+    func testAskingCanBeTurnedOff() {
+        var app = launch()
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        more(app, "Settings")
+        let toggle = settingsSwitch(app, "Ask before ending a game")
+        XCTAssertNotNil(toggle)
+        // A switch's value is "1" on iPhone and the number 1 on the Mac: compare as text.
+        XCTAssertEqual(toggle.map { "\($0.value ?? "")" }, "1", "on by default")
+        toggle?.press()
+        closeSettings(app)
+        app.descendants(matching: .any)["Stock, 24 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5))
+        app.buttons["New Game"].firstMatch.press()
+        XCTAssertNil(confirmation(app, timeout: 2), "no question")
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5), "dealt at once")
+        app.terminate()
+        app = launch(reset: false)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        app.descendants(matching: .any)["Stock, 24 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5))
+        app.descendants(matching: .any)["drawChip"].press()
+        XCTAssertNil(confirmation(app, timeout: 2), "still off after a relaunch; the chip doesn't ask either")
+        XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw three")
+    }
+
     /// The draw chip switches mode by dealing: at once on a fresh deal, asked first mid-game; the
     /// mode survives a relaunch. Random deals (no seed): a seeded launch always builds a fresh
     /// Draw 1 game and ignores the save, so it could never show the mode being remembered.
