@@ -50,6 +50,7 @@ final class SolitaireUITests: XCTestCase {
         let card = app.descendants(matching: .any)["winCard"]
         XCTAssertTrue(card.exists, "the win card")
         XCTAssertTrue(card.buttons["New Game · Draw 1"].exists && card.buttons["Draw 3 instead"].exists)
+        XCTAssertTrue(card.descendants(matching: .any)["1 pass"].exists, "passes on the win card")
         card.buttons["Close"].press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForNonExistence(timeout: 5), "Close dismisses it")
     }

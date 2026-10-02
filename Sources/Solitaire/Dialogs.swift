@@ -153,6 +153,7 @@ struct WinCard: View {
     let drawCount: Int
     let moves: Int
     let elapsed: TimeInterval
+    let passes: Int
     var wide = false
     let newGame: (Int) -> Void
     let close: () -> Void
@@ -174,6 +175,7 @@ struct WinCard: View {
             HStack(spacing: 8) {
                 figure("MOVES", "\(moves)", spoken: "\(moves) moves")
                 figure("TIME", GameHeader.clock(elapsed), spoken: "Time \(GameHeader.spokenClock(elapsed))")
+                figure("PASSES", "\(passes)", spoken: passes == 1 ? "1 pass" : "\(passes) passes")
             }
             .padding(.vertical, 14)
             .overlay(alignment: .top) { DialogColors.hairline.frame(height: 1) }

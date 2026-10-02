@@ -20,7 +20,7 @@ private func tempSaveURL() -> URL {
     /// foundations and 7 columns) — plus a valid draw mode and sane counters.
     @Test(arguments: [
         "won", "3 foundations", "8 columns", "51 cards", "duplicate card", "rank 14", "draw 2",
-        "negative moves", "negative time",
+        "negative moves", "negative time", "negative redeals",
         "face-down column top", "face-up stock", "face-down waste", "foundation out of order",
         "mixed foundation", "unbuilt run",
     ])
@@ -36,6 +36,7 @@ private func tempSaveURL() -> URL {
         case "draw 2": s.drawCount = 2
         case "negative moves": s.moveCount = -1
         case "negative time": s.elapsed = -1
+        case "negative redeals": s.redeals = -1
         case "face-down column top": s.tableau[6][6].isFaceUp = false
         case "face-up stock": s.stock[0].isFaceUp = true
         case "face-down waste":

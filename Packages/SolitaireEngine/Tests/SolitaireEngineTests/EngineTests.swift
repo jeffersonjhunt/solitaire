@@ -189,8 +189,10 @@ typealias E = SolitaireEngine
         while !s.stock.isEmpty { E.drawFromStock(&s); firstPass.append(s.waste) }
         let moves = s.moveCount
 
+        #expect(s.redeals == 0 && s.passes == 1, "draws alone stay on the first pass")
         E.drawFromStock(&s)                                      // redeal
         #expect(s.moveCount == moves + 1, "a redeal counts as one move")
+        #expect(s.redeals == 1 && s.passes == 2, "a redeal starts the second pass")
         #expect(s.waste.isEmpty)
         #expect(s.stock == stockBefore, "same order, face down")
         #expect(s.stock.map(\.id) == firstPass.last!.reversed().map(\.id))
@@ -357,4 +359,28 @@ enum GoldenDeal {
                               14, 43, 18, 13, 19, 1, 33, 7]
     /// The first seed (of 1...400, 44 winnable) that `playGreedily` wins with draw 1.
     static let solvableSeed: UInt64 = 4
+}
+
+// MARK: - Passes through the deck (spec "Draw modes")
+
+@Suite struct Passes {
+    @Test func aNewDealIsOnItsFirstPass() {
+        #expect(E.newGame(drawCount: 3, seed: 7).passes == 1)
+    }
+
+    /// A save written before passes were counted has no `redeals`: it resumes with none.
+    @Test func olderSavesResumeWithNoRedeals() throws {
+        var s = E.newGame(drawCount: 1, seed: 7)
+        s.redeals = 4
+        let data = try JSONEncoder().encode(s)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["redeals"] as? Int == 4, "written")
+        object.removeValue(forKey: "redeals")
+        let old = try JSONDecoder().decode(GameState.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.redeals == 0 && old.passes == 1)
+        var expected = s
+        expected.redeals = 0
+        #expect(old == expected, "everything else as saved")
+        #expect(try JSONDecoder().decode(GameState.self, from: data) == s, "a round trip keeps the count")
+    }
 }
