@@ -27,11 +27,12 @@ enum TableColors {
     static let onAccent = Color(red: 0.039, green: 0.039, blue: 0.039)       // #0A0A0A
 }
 
-/// Moves, time and this game's draw mode, over the board — the same on every platform, its edges
-/// in line with the outer columns (`width`, the board's used width). `compact`: the smaller form
-/// that sits inside the bar on a phone held sideways.
+/// Moves, time and the draw chip, over the board — the same on every platform, its edges in line
+/// with the outer columns (`width`, the board's used width). `compact`: the smaller form that sits
+/// inside the bar on a phone held sideways. The chip shows this game's draw mode and switches it.
 struct GameHeader: View {
     let store: GameStore
+    let ui: AppUI
     var width: CGFloat?
     var compact = false
 
@@ -59,15 +60,37 @@ struct GameHeader: View {
                 .accessibilityLabel("Time \(Self.spokenClock(store.state.elapsed))")
                 .accessibilityAddTraits(.isStaticText)
             if !compact { Spacer(minLength: 8) }
-            let chip = Self.drawChip(current: store.state.drawCount, next: store.preferredDrawCount)
-            Text(chip.text)
-                .font(AppFont.mono(11, relativeTo: .caption2))
-                .tracking(1.1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .overlay(Capsule().strokeBorder(TableColors.text.opacity(0.3)))
-                .accessibilityLabel(chip.spoken)
+            drawChip
         }
+    }
+
+    /// "DRAW 1" / "DRAW 3": a button that switches to the other mode by dealing a new game in it
+    /// (asked first when a game is in progress). The capsule is 28 pt tall; its tap target reaches
+    /// 8 pt beyond it above and below (44 pt) without making the header any taller.
+    private var drawChip: some View {
+        let chip = Self.drawChip(current: store.state.drawCount)
+        return Button { ui.requestNewGame(drawCount: chip.other, store: store) } label: {
+            HStack(spacing: 6) {
+                Text(chip.text)
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .opacity(0.75)
+            }
+            .font(AppFont.mono(11, relativeTo: .caption2))
+            .tracking(1.1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .overlay(Capsule().strokeBorder(TableColors.text.opacity(0.3)))
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ChipButtonStyle())
+        .focusable(false)                                       // see ActionBar.buttons
+        .padding(.vertical, -8)
+        .accessibilityLabel(chip.spoken)
+        .accessibilityHint(chip.hint)
+        .accessibilityInputLabels([chip.text.capitalized, chip.spoken, "Draw mode"])   // Voice Control: "Draw 1" works
+        .accessibilityIdentifier("drawChip")
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
@@ -81,12 +104,11 @@ struct GameHeader: View {
         }
     }
 
-    /// This game's draw mode — and the next deal's, when it has been changed (More, Game ▸ Draw
-    /// Three), so the change shows at once instead of only after the next deal.
-    nonisolated static func drawChip(current: Int, next: Int) -> (text: String, spoken: String) {
+    /// The chip for this game's draw mode, and the mode it switches to.
+    nonisolated static func drawChip(current: Int) -> (text: String, spoken: String, hint: String, other: Int) {
+        let other = current == 3 ? 1 : 3
         let word = { $0 == 3 ? "three" : "one" }
-        if current == next { return ("DRAW \(current)", "Draw \(word(current))") }
-        return ("DRAW \(current) · NEXT \(next)", "Draw \(word(current)); next game draws \(word(next))")
+        return ("DRAW \(current)", "Draw \(word(current))", "Switches to Draw \(other) and starts a new game", other)
     }
 
     static func clock(_ elapsed: TimeInterval) -> String {
@@ -102,7 +124,8 @@ struct GameHeader: View {
 }
 
 /// The four controls along the bottom, the same on every platform: Undo, Finish (burnt orange
-/// when auto-finish is available), New Game (asks for the draw count) and More. Each is a 60 pt
+/// when auto-finish is available), New Game (deals at once in the same mode; asks first mid-game)
+/// and More. Each is a 60 pt
 /// tall target; on iPad and the Mac the row is centred, at most 560 pt wide. `withStats`: a phone
 /// held sideways, where height is short — the header folds in on the left and the buttons are
 /// 52 pt tall, which gives the cards back the header's height.
@@ -110,7 +133,6 @@ struct ActionBar: View {
     let store: GameStore
     let ui: AppUI
     var withStats = false
-    @State private var choosingNewGame = false
     #if os(macOS)
     @State private var showingMore = false
     @Environment(\.openWindow) private var openWindow
@@ -119,7 +141,7 @@ struct ActionBar: View {
     var body: some View {
         HStack(spacing: 16) {
             if withStats {
-                GameHeader(store: store, compact: true)
+                GameHeader(store: store, ui: ui, compact: true)
                 Spacer(minLength: 0)
             }
             buttons.frame(maxWidth: withStats ? 480 : 560)
@@ -132,60 +154,28 @@ struct ActionBar: View {
         .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.08)).frame(height: 1) }
     }
 
+    /// Like cards, the controls never take keyboard focus (no focus ring; Space never presses a
+    /// focused button instead of drawing): the keyboard reaches all of them through the menus —
+    /// ⌘Z, ⌘↩, ⌘N, Game ▸ Draw Three, Help and Settings.
     private var buttons: some View {
         HStack(spacing: 4) {
             Button { store.undo() } label: { BarLabel(title: "Undo", symbol: "arrow.uturn.backward") }
                 .disabled(!store.canUndo)                       // also off once the game is won
+                .focusable(false)
             Button { store.autoFinish() } label: { BarLabel(title: "Finish", symbol: "forward") }
                 .buttonStyle(BarButtonStyle(prominent: store.canAutoFinish))
                 .disabled(!store.canAutoFinish)
                 .accessibilityLabel("Auto-finish")
                 .accessibilityInputLabels(["Finish", "Auto-finish"])   // Voice Control: the visible word works
-            newGameControl
+                .focusable(false)
+            Button { ui.requestNewGame(store: store) } label: {
+                BarLabel(title: "New Game", symbol: "plus.rectangle.on.rectangle")
+            }
+            .focusable(false)
             moreControl
+                .focusable(false)
         }
         .buttonStyle(BarButtonStyle())
-    }
-
-    /// Starting a new game asks for the draw count (spec): a small sheet on iPhone, a popover on
-    /// iPad and the Mac. The choice is remembered for the next deal.
-    @ViewBuilder
-    private var newGameControl: some View {
-        let button = Button { choosingNewGame = true } label: {
-            BarLabel(title: "New Game", symbol: "plus.rectangle.on.rectangle")
-        }
-        #if os(iOS)
-        Group {
-            if UIDevice.current.userInterfaceIdiom == .phone {
-                button.sheet(isPresented: $choosingNewGame) {
-                    NewGameChooser(store: store, ui: ui) { choosingNewGame = false }
-                        .presentationDetents([.height(220)])
-                }
-            } else {
-                button.popover(isPresented: $choosingNewGame) {
-                    NewGameChooser(store: store, ui: ui) { choosingNewGame = false }
-                        .frame(width: 320)
-                }
-            }
-        }
-        #else
-        button.popover(isPresented: $choosingNewGame, arrowEdge: .top) {
-            VStack(spacing: 12) {
-                Text("New Game").font(.headline)
-                HStack(spacing: 10) {
-                    ForEach([1, 3], id: \.self) { count in
-                        Button("Draw \(count)") {
-                            choosingNewGame = false
-                            store.newGame(drawCount: count)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(store.preferredDrawCount == count ? .accentColor : .gray)
-                    }
-                }
-            }
-            .padding(16)
-        }
-        #endif
     }
 
     /// How to Play, Settings… and About Solitaire (spec "Settings, About and the More menu").
@@ -245,6 +235,13 @@ struct BarLabel: View {
     }
 }
 
+/// The draw chip: dims while pressed, like the bar's buttons.
+struct ChipButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.6 : 1)
+    }
+}
+
 /// The bar's buttons: plain on the felt, burnt orange when prominent, dimmed when disabled.
 struct BarButtonStyle: ButtonStyle {
     var prominent = false
@@ -260,37 +257,3 @@ struct BarButtonStyle: ButtonStyle {
             .contentShape(shape)
     }
 }
-
-#if os(iOS)
-/// The new-game choice on iPhone (sheet) and iPad (popover): the two draw modes, the current one
-/// marked. Resuming at launch and How to Play live in Settings and More.
-struct NewGameChooser: View {
-    let store: GameStore
-    let ui: AppUI
-    let done: () -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("New Game").font(.headline)
-            HStack(spacing: 12) {
-                choice("Draw 1", count: 1)
-                choice("Draw 3", count: 3)
-            }
-            Button("Cancel", role: .cancel, action: done)
-        }
-        .padding(24)
-    }
-
-    private func choice(_ title: String, count: Int) -> some View {
-        Button {
-            store.newGame(drawCount: count)
-            done()
-        } label: {
-            Text(title).frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(store.preferredDrawCount == count ? .accentColor : .gray)
-        .accessibilityHint(store.preferredDrawCount == count ? "Current choice" : "")
-    }
-}
-#endif

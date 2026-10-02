@@ -26,10 +26,12 @@ final class GameStore {
     /// board raises them above everything while they animate, so they never slide under a deeper
     /// column; the clock ticking does not reset it.
     private(set) var movedCardIDs: Set<Int> = []
-    /// The draw mode the next deal uses (toggled from the Game menu). Every change is remembered
-    /// straight away, whether or not a game window is open.
-    var preferredDrawCount: Int {
-        didSet { if preferredDrawCount != oldValue { rememberDrawCount?(preferredDrawCount) } }
+    /// The draw mode of the last deal (or of the game resumed): what New Game deals next and what a
+    /// fresh launch deals. Every change is remembered straight away, whether or not a game window
+    /// is open. Only dealing changes it — the draw chip switches mode by dealing (spec "New games
+    /// and the draw mode").
+    private(set) var lastDrawCount: Int {
+        didSet { if lastDrawCount != oldValue { rememberDrawCount?(lastDrawCount) } }
     }
     /// Stores the draw-count setting (UserDefaults in the app; nil in tests).
     @ObservationIgnored var rememberDrawCount: ((Int) -> Void)?
@@ -66,19 +68,22 @@ final class GameStore {
     /// - Parameter makeSeed: where deal seeds come from; tests inject a fixed sequence.
     init(drawCount: Int = 1, makeSeed: @escaping () -> UInt64 = { UInt64.random(in: .min ... .max) }) {
         self.makeSeed = makeSeed
-        preferredDrawCount = Self.validDrawCount(drawCount)
+        lastDrawCount = Self.validDrawCount(drawCount)
         state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed())
     }
 
     /// Nothing undoes a win: a won game cannot be un-won (spec decision).
     var canUndo: Bool { !undoStack.isEmpty && !state.isWon }
     var canAutoFinish: Bool { SolitaireEngine.canAutoFinish(state) }
+    /// A game the player would lose by dealing again: a move (a draw included) made, and not won.
+    /// Only such a game is asked about before a new deal replaces it.
+    var isInProgress: Bool { state.moveCount > 0 && !state.isWon }
 
     // MARK: Intents
 
-    /// Deals a new game in the preferred draw mode.
+    /// Deals a new game in the remembered draw mode.
     func newGame() {
-        newGame(drawCount: preferredDrawCount)
+        newGame(drawCount: lastDrawCount)
     }
 
     /// Deals a new game. An out-of-range draw count (e.g. a corrupted setting) becomes 1; the
@@ -86,8 +91,8 @@ final class GameStore {
     func newGame(drawCount: Int) {
         stopAutoFinish()
         pendingDrag = nil
-        preferredDrawCount = Self.validDrawCount(drawCount)
-        state = SolitaireEngine.newGame(drawCount: preferredDrawCount, seed: makeSeed())
+        lastDrawCount = Self.validDrawCount(drawCount)
+        state = SolitaireEngine.newGame(drawCount: lastDrawCount, seed: makeSeed())
         undoStack.removeAll()
         updateClock()
     }
@@ -95,6 +100,7 @@ final class GameStore {
     /// Continues a game from a given state (a saved game, or a test position). Undo starts empty.
     func resume(from saved: GameState) {
         stopAutoFinish()
+        lastDrawCount = Self.validDrawCount(saved.drawCount)
         state = saved
         undoStack.removeAll()
         updateClock()
@@ -109,11 +115,6 @@ final class GameStore {
         }
         perform(Move(source: pile, index: index, destination: destination))
         return true
-    }
-
-    /// Game menu: switch the draw mode for the next deal (the game in progress is unchanged).
-    func toggleDrawMode() {
-        preferredDrawCount = preferredDrawCount == 1 ? 3 : 1
     }
 
     /// A drag has passed its threshold on this card. Returns false (and holds nothing) for a card
@@ -215,7 +216,12 @@ final class GameStore {
         }
     }
 
-    private func stopAutoFinish() {
+    /// True while auto-finish is sending cards home.
+    var isAutoFinishing: Bool { finishing != nil }
+
+    /// Stops auto-finish where it is (a new deal, a resume, or the new-game question); Finish
+    /// stays available to start it again.
+    func stopAutoFinish() {
         finishing?.cancel()
         finishing = nil
     }

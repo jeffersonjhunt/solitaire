@@ -26,7 +26,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !shortScreen { GameHeader(store: store, width: boardWidth) }
+            if !shortScreen { GameHeader(store: store, ui: ui, width: boardWidth) }
             BoardView(store: store) { cascadeFinishedSeed = store.state.seed }   // draws the win cascade itself
                 .onGeometryChange(for: CGFloat.self) { [isTouch = BoardView.isTouch] proxy in
                     BoardMetrics(size: proxy.size, isTouch: isTouch).usedWidth
@@ -35,6 +35,9 @@ struct ContentView: View {
         }
         .background(TableBackground().ignoresSafeArea())
         .environment(\.cardStyle, CardStyle(face: cardFace, back: cardBack))
+        #if os(macOS)
+        .background(QuitWhenClosed())
+        #endif
         #if os(iOS)
         // Haptics, iOS and iPadOS only: light on a move, soft on a draw, success on a win.
         .sensoryFeedback(trigger: store.feedback) { _, event in
@@ -54,7 +57,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: Binding(get: { ui.showingSettings }, set: { ui.showingSettings = $0 })) {
             NavigationStack {
-                SettingsView(store: store)
+                SettingsView()
                     .navigationTitle("Settings")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -73,9 +76,21 @@ struct ContentView: View {
             }
         }
         #endif
+        // New Game, the draw chip and the menus ask here before losing a game in progress.
+        .alert(ui.pendingNewGame?.title ?? "",
+               isPresented: Binding(get: { ui.pendingNewGame != nil }, set: { if !$0 { ui.pendingNewGame = nil } }),
+               presenting: ui.pendingNewGame) { request in
+            Button(request.confirm, role: .destructive) {
+                ui.pendingNewGame = nil
+                store.newGame(drawCount: request.drawCount)
+            }
+            Button("Cancel", role: .cancel) { ui.pendingNewGame = nil }
+        } message: { request in
+            Text(request.message)
+        }
         .sheet(isPresented: winSheetShown) {
             WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed,
-                     preferredDrawCount: store.preferredDrawCount) { count in
+                     lastDrawCount: store.lastDrawCount) { count in
                 store.newGame(drawCount: count)
             }
         }
@@ -114,7 +129,7 @@ struct TableBackground: View {
 struct WinSheet: View {
     let moves: Int
     let elapsed: TimeInterval
-    let preferredDrawCount: Int
+    let lastDrawCount: Int
     let newGame: (Int) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -131,7 +146,7 @@ struct WinSheet: View {
                 Button("Close") { dismiss() }
                 ForEach([1, 3], id: \.self) { count in
                     let button = Button("New Game: Draw \(count)") { newGame(count) }
-                    if count == preferredDrawCount {
+                    if count == lastDrawCount {
                         button.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     } else {
                         button.buttonStyle(.bordered)
@@ -147,3 +162,28 @@ struct WinSheet: View {
 #Preview {
     ContentView(store: GameStore(), ui: AppUI())
 }
+
+#if os(macOS)
+/// The game window is the app (spec): closing it quits Solitaire — saving as any quit does — so
+/// it never runs without a game on screen. Other windows (How to Play, About, Settings) close
+/// with it. Watches this view's own window, so only the game window's closing counts.
+private struct QuitWhenClosed: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { WindowWatcher() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class WindowWatcher: NSView {
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            guard let window else { return }
+            observer = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+                MainActor.assumeIsolated { NSApp.terminate(nil) }
+            }
+        }
+    }
+}
+#endif

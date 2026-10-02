@@ -34,7 +34,7 @@ Legal moves the engine must allow, and nothing else:
 - Foundation top card back to a tableau column, under the same colour-and-rank rule.
 - Turning a card face up: when a move leaves a column's last card face down, it flips face up automatically. This is part of the same move for undo purposes.
 
-Draw modes: draw 1 or draw 3, chosen when a game is dealt. Draw 3 turns up to three cards to the waste and only the topmost is playable. Redeals are unlimited: with the stock empty, tapping it returns the waste to the stock in reverse order, face down, and counts as one move.
+Draw modes: draw 1 or draw 3, fixed for the life of a deal; switching mode deals a new game (see "New games and the draw mode"). Draw 3 turns up to three cards to the waste and only the topmost is playable. Redeals are unlimited: with the stock empty, tapping it returns the waste to the stock in reverse order, face down, and counts as one move.
 
 The game is won when all four foundations hold 13 cards. There is no scoring and no loss state — a stuck game is simply a game the player restarts or undoes out of.
 
@@ -130,7 +130,7 @@ Every platform supports both ways of moving a card: a single tap or click sends 
 
 A drag begins after 8 points of movement so a slow tap is still a tap. The dragged run renders in an overlay above all piles with a slightly stronger shadow, tracks the finger or pointer one-to-one, and animates home in 0.2 s on an illegal drop. Only face-up cards are draggable, and only the top card of the waste or a foundation.
 
-Keyboard and menus on macOS, through `CommandGroup`: New Game (⌘N), Undo (⌘Z), Draw (space), Auto-finish (⌘⏎), Toggle draw mode in a Game menu, and the standard window and help groups. On iPadOS the same shortcuts work from a hardware keyboard via `.keyboardShortcut`. VoiceOver labels every card as rank and suit, and every empty pile by name.
+Keyboard and menus on macOS, through `CommandGroup`: New Game (⌘N), New Game: Draw 1 / Draw 3, Undo (⌘Z), Draw (space), Auto-finish (⌘⏎), Draw Three in a Game menu (it switches mode as the draw chip does), and the standard window and help groups. On iPadOS the same shortcuts work from a hardware keyboard via `.keyboardShortcut`. Like the cards, the on-screen controls (the bar's buttons and the draw chip) never take keyboard focus, so no focus ring is drawn and Space always draws rather than pressing a focused button; the keyboard reaches every one of them through the shortcuts and menus. VoiceOver labels every card as rank and suit, and every empty pile by name.
 
 Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impact on a stock draw, a success notification on a win. Nothing on failure beyond the wiggle. Sound is out of scope for v1.
 
@@ -152,7 +152,7 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Face-up fan | Card height × 0.29, scaled down together with the face-down fan when a column would overflow the board |
 | Minimum hit target | 44 pt on touch; cards below that width force a compressed layout |
 
-The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with moves, elapsed time and the draw mode in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
+The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with moves, elapsed time and the draw chip (the current game's draw mode, a button) in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
 
 Cards are drawn in SwiftUI, not images, in the face and back the player has chosen (see "Card styles"): a rounded rectangle with a hairline border and a 1 pt shadow, corner index top-left, a large suit below it.
 
@@ -202,21 +202,40 @@ Rules every style keeps:
 
 **More** (the fourth button of the bottom bar) offers three items on every platform: **How to Play**,
 **Settings…** and **About Solitaire**. On iPhone it is a menu; on iPad and the Mac a popover. On
-the Mac, ⌘, and Solitaire ▸ Settings… open Settings, Solitaire ▸ About Solitaire opens About, and
-Game ▸ Draw Three stays in the menu bar.
+the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ About Solitaire opens About.
 
 **Settings** — a sheet on iPhone and iPad, the Settings window on the Mac:
 
-- **Game:** draw mode for the next deal (one card or three; it does not change the game in
-  progress) and resume the game in progress at launch.
+- **Game:** resume the game in progress at launch. (The draw mode is not a setting: the draw
+  chip switches it — see "New games and the draw mode".)
 - **Card face:** the four faces as tappable previews (an ace of hearts in each), the current one
   ringed in burnt orange (#CC5500).
 - **Card back:** the four backs as tappable previews, ringed the same way.
 - A live preview at the top: the chosen back beside two cards in the chosen face.
 
-Changes apply immediately and are saved at once. The new-game chooser keeps only the choice it
-exists for — Draw 1 or Draw 3 (and Cancel); resuming at launch and How to Play live in Settings and
-More.
+Changes apply immediately and are saved at once.
+
+## New games and the draw mode
+
+A game is **in progress** once at least one move (a draw included) has been made and it is not won.
+Only a game in progress is ever asked about; a fresh deal or a won game is replaced without a
+question, because nothing would be lost.
+
+- **New Game** (the bar button, ⌘N, File ▸ New Game) deals at once in the current game's draw
+  mode. In progress, it first asks: "Start a new game? This one will be lost." — **New Game** /
+  **Cancel**. There is no draw-count chooser.
+- **The draw chip** ("DRAW 1" / "DRAW 3", in the header, or in the bar on a phone held sideways)
+  is a button that switches to the other mode by dealing a new game in it. In progress, it first
+  asks: "Switch to Draw 3? This starts a new game, and the current one will be lost." —
+  **Start New Game** / **Cancel**. VoiceOver reads it as "Draw 1", hint "Switches to Draw 3 and
+  starts a new game".
+- **On the Mac:** Game ▸ Draw Three switches as the chip does; File ▸ New Game: Draw 1 / Draw 3
+  deal in that mode; each asks first when a game is in progress.
+- **The win sheet** keeps New Game: Draw 1 / Draw 3 — the game is over, so nothing is asked.
+
+The mode of the last deal is remembered and used for the next New Game and the next launch's
+fresh deal. Cancel leaves the game, its mode and its timer untouched. Asking stops auto-finish
+where it is, so a game cannot be won behind the question; Finish is offered again after Cancel.
 
 **About** — a sheet on iPhone and iPad, its own window on the Mac (replacing the standard About
 panel):
@@ -240,9 +259,9 @@ The game in progress is saved as JSON to `Application Support/Solitaire/game.jso
 
 On launch the app decodes that file, checks it holds 52 distinct cards and is not already won, and resumes it; anything invalid is discarded silently and a fresh game is dealt. The undo stack is not persisted — a resumed game starts with undo empty.
 
-Settings live in `UserDefaults` via `@AppStorage`: draw count (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic) and the card back (default Classic Blue). An unknown or invalid stored value falls back to the default. Starting a new game asks for the draw count in a small sheet on iPhone, a popover on iPad and the Mac, and the choice is remembered for the next deal.
+Settings live in `UserDefaults` via `@AppStorage`: the draw count of the last deal (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic) and the card back (default Classic Blue). An unknown or invalid stored value falls back to the default. New games deal in the remembered draw count; the draw chip changes it (see "New games and the draw mode").
 
-On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size.
+On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size. The game window is the app: closing it quits Solitaire (saving as any quit does), and any How to Play, About or Settings window closes with it — so a menu command can never act on a game that is not on screen.
 
 ## Acceptance criteria and open decisions
 
@@ -273,10 +292,12 @@ Recorded as they are made; each overrides anything above it conflicts with.
 | 2026-09-27 | Once the game is won, no move or draw is allowed, so a won game cannot be un-won. |
 | 2026-09-27 | An invalid stored draw count is clamped by the store before dealing; the engine's `newGame` keeps its 1-or-3 precondition. A resumed save must also have exactly 4 foundations and 7 columns. |
 | 2026-09-27 (wording 2026-09-30) | Any build distributed outside this Mac (TestFlight, App Store, a shared `.app`) must not let a debugger attach: on the Mac the `com.apple.security.get-task-allow` entitlement is absent; on iOS/iPadOS `get-task-allow` is `false` (App Store signing always writes the key, set to false). Local development builds allow it, and that is fine for development. `tools/check-release.sh` enforces this before every upload. |
-| 2026-09-27 | New games ask for the draw count everywhere (toolbar, win sheet) except ⌘N, which the spec lists as a direct shortcut: it deals at once in the remembered mode. |
+| 2026-09-27 | (Superseded 2026-10-01 by the draw chip.) New games ask for the draw count everywhere (toolbar, win sheet) except ⌘N, which the spec lists as a direct shortcut: it deals at once in the remembered mode. |
 | 2026-09-27 | "Same elapsed time" after a relaunch: quitting normally (⌘Q on the Mac, or iOS sending the app to the background) saves on the spot, so the time comes back exactly. A true force quit gives the app no chance to save, so the time comes back to the last save — at most five seconds earlier, the spec's own save cadence. |
 | 2026-09-27 | Layout D1 — short, wide boards (phone landscape, short Mac windows): card width is the spec's width rule, capped by height so the top row plus a column of six face-down cards under a nine-card run (K→5) fits with its face-up fan no smaller than 0.24 × card height (readable; 0.2 until the corner index gained a top margin on 2026-10-01). Longer runs squeeze further. Where height is plentiful the width rule is unchanged. |
 | 2026-09-27 | Layout D2 — "compressed layout": on touch, when cards would be narrower than 44 pt, gaps drop to the 4 pt minimum and each card's tap area widens to its whole column slot. |
 | 2026-10-01 | Direction A, chosen from mockups (design canvas "Solitaire layout mockups"): one layout for iPhone, iPad and Mac. Phone-width boards (under 500 pt) use 3 pt column gaps and 4 pt side margins, for cards about 9% larger. A row gap of 0.8 × card width separates the top row from the columns, capped at 16 pt on a touch board held sideways. Header (moves, time, draw mode; Space Mono, SIL OFL) over the board; a bottom bar with four labelled 60 pt buttons (Undo, Finish, New Game, More) on every platform, the Mac included; Finish is burnt orange (#CC5500) when auto-finish is available. On a phone held sideways the header folds into the bar (52 pt buttons), which keeps the cards about as large as before. |
 | 2026-10-01 | Card styles, Settings and About (plan agreed from the "Cards" and "Settings and About" mockups): faces Classic, Big Index, Vintage and Night; backs Classic Blue, Burnt Orange, Racing Green and Art Deco (Art Deco replaced Night Pinstripe after a look on TestFlight); chosen independently, Classic + Classic Blue by default, applied live. Four Colour was left out: blue diamonds and green clubs blur Klondike's red/black alternation. More offers How to Play, Settings… and About Solitaire; Draw Three and Resume move into Settings, and the new-game chooser keeps only Draw 1 / Draw 3. About links open in the browser; the app still has no network code. Copyright line: "© 2026 One Off Endeavors". |
 | 2026-10-01 | Corner index margin (after a look at TestFlight build 202610012043): the index sat almost on the card's top edge. It now has a 0.07 × card width margin above it, as at its left, at full size; to keep D1's promise that it reads in the tightest fan, the minimum face-up fan rises from 0.2 to 0.24 × card height. Portrait boards are unchanged; on a phone held sideways or a short Mac window cards come out about 8 % smaller. |
+| 2026-10-01 | Draw chip and direct New Game (after U12 on TestFlight): the header's draw mode becomes a button that switches mode by dealing a new game, and New Game deals at once in the current mode — no chooser. Both ask before replacing a game in progress (a move made, not won), never otherwise. Settings drops the draw picker and the chip drops "· NEXT n": one place to change the mode, always showing the game being played. |
+| 2026-10-01 | Closing the Mac's game window quits the app (U13 review): with the window gone, ⌘N's question had nowhere to appear and surfaced later. |

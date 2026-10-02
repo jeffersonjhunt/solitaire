@@ -45,7 +45,7 @@ final class SolitaireUITests: XCTestCase {
         // XCUITest's click on a window never reaches its content.)
         app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 5))
-        // A new game from the win sheet asks for the draw count, like every other way to start one.
+        // The game is over, so the win sheet offers both modes straight away (nothing to confirm).
         XCTAssertTrue(app.buttons["New Game: Draw 1"].exists && app.buttons["New Game: Draw 3"].exists)
     }
 
@@ -180,24 +180,99 @@ final class SolitaireUITests: XCTestCase {
     /// Seconds the clock keeps running around a quit and relaunch (quit ~1 s, iOS relaunch ~3 s).
     private static let relaunchSlack = 6
 
-    /// Starting a new game asks for the draw count — a sheet on iPhone, the File menu pair on the
-    /// Mac — and deals in that mode.
-    func testNewGameAsksForTheDrawCount() {
+    /// New Game deals at once on a fresh deal; mid-game it asks, and Cancel keeps the game.
+    /// Random deals (no seed): a seeded launch deals that seed every time, so a new deal would
+    /// look identical.
+    func testNewGameAsksOnlyWhenAGameWouldBeLost() {
+        let app = launch()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        let firstDeal = dealSignature(app)
+        XCTAssertEqual(firstDeal.count, 7)
+        app.buttons["New Game"].firstMatch.press()
+        XCTAssertNil(confirmation(app, timeout: 2), "nothing to lose on a fresh deal: no question")
+        XCTAssertNotEqual(dealSignature(app), firstDeal, "dealt at once")
+        app.descendants(matching: .any)["Stock, 24 cards"].press()                  // a move
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5))
+        app.buttons["New Game"].firstMatch.press()
+        let ask = confirmation(app)
+        XCTAssertNotNil(ask, "mid-game, New Game asks first")
+        ask?.buttons["Cancel"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 3), "Cancel keeps the game")
+        app.buttons["New Game"].firstMatch.press()
+        confirmation(app)?.buttons["New Game"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5), "confirmed: a new deal")
+    }
+
+    /// The draw chip switches mode by dealing: at once on a fresh deal, asked first mid-game; the
+    /// mode survives a relaunch. Random deals (no seed): a seeded launch always builds a fresh
+    /// Draw 1 game and ignores the save, so it could never show the mode being remembered.
+    func testDrawChipSwitchesTheDrawMode() {
+        var app = launch()
+        let chip = app.descendants(matching: .any)["drawChip"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        XCTAssertEqual(chip.label, "Draw one")
+        chip.press()
+        XCTAssertNil(confirmation(app, timeout: 2), "a fresh deal switches without asking")
+        XCTAssertEqual(chip.label, "Draw three")
+        app.descendants(matching: .any)["Stock, 24 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 21 cards"].waitForExistence(timeout: 5), "a draw-3 deal")
+        chip.press()
+        let ask = confirmation(app)
+        XCTAssertNotNil(ask, "mid-game, the chip asks first")
+        ask?.buttons["Cancel"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 21 cards"].waitForExistence(timeout: 3), "Cancel keeps the game")
+        XCTAssertEqual(chip.label, "Draw three")
+        chip.press()
+        confirmation(app)?.buttons["Start New Game"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        XCTAssertEqual(chip.label, "Draw one")
+        chip.press()                                                                // fresh: Draw 3 again
+        XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw three")
+        app.terminate()
+        app = launch(reset: false)
+        XCTAssertTrue(app.descendants(matching: .any)["drawChip"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw three", "remembered")
+        #if os(macOS)
+        // The Game menu's Draw Three switches as the chip does.
+        app.menuBars.menuBarItems["Game"].click()
+        app.menuBars.menuItems["Draw Three"].click()
+        XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw one")
+        #endif
+    }
+
+    #if os(macOS)
+    /// Closing the game window quits the app — even with another of its windows open — so ⌘N can
+    /// never act on a game that isn't on screen.
+    func testClosingTheGameWindowQuits() {
         let app = launch(seed: 4)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
-        #if os(macOS)
-        app.menuBars.menuBarItems["File"].click()
-        app.menuBars.menuItems["New Game: Draw 3"].click()
-        #else
-        app.buttons["New Game"].press()
-        XCTAssertTrue(app.buttons["Draw 3"].waitForExistence(timeout: 5), "the draw-count choice is offered")
-        app.buttons["Draw 3"].press()
-        #endif
-        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
-        XCTAssertTrue(stock.waitForExistence(timeout: 5))
-        stock.press()
-        XCTAssertTrue(app.descendants(matching: .any)["Stock, 21 cards"].waitForExistence(timeout: 5),
-                      "a draw-3 deal turns three cards")
+        more(app, "About Solitaire")
+        XCTAssertTrue(app.windows["About Solitaire"].waitForExistence(timeout: 5))
+        let game = app.windows.matching(NSPredicate(format: "title == 'Solitaire'")).firstMatch
+        XCTAssertTrue(game.exists, "the game window")
+        game.buttons[XCUIIdentifierCloseWindow].click()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10), "closing the game window quits")
+    }
+    #endif
+
+    /// The question before losing a game: an alert on iPhone and iPad, a sheet on the Mac. Nil if
+    /// none appears within `timeout`.
+    @discardableResult
+    private func confirmation(_ app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            for query in [app.alerts, app.sheets, app.dialogs] where query.firstMatch.exists {
+                return query.firstMatch
+            }
+            usleep(200_000)
+        } while Date() < deadline
+        return nil
+    }
+
+    /// The seven face-up column cards, which identify a deal.
+    private func dealSignature(_ app: XCUIApplication) -> [String] {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS ', column '"))
+            .allElementsBoundByIndex.map(\.label)
     }
 
     /// The waste top's label ("7 of Clubs, waste"), to compare boards across a relaunch.
@@ -252,6 +327,7 @@ final class SolitaireUITests: XCTestCase {
         more(app, "Settings…")
         let night = app.buttons["Night"].firstMatch
         XCTAssertTrue(night.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Three cards"].exists, "the draw mode is the chip's, not a setting")
         XCTAssertFalse(night.isSelected, "Classic is the default")
         night.press()
         app.buttons["Art Deco"].firstMatch.press()
