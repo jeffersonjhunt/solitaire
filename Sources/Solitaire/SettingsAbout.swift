@@ -36,10 +36,12 @@ struct SettingsView: View {
                 // switch alone would reach VoiceOver unnamed.
                 Toggle("Resume game at launch", isOn: $resumeOnLaunch)
                     .accessibilityLabel("Resume game at launch")
+                    .tint(TableColors.accent)
                 Toggle("Draw pile on the right", isOn: Binding(
                     get: { drawPileSide == .right },
                     set: { drawPileSide = $0 ? .right : .left }))
                     .accessibilityLabel("Draw pile on the right")
+                    .tint(TableColors.accent)
             }
             Section("Card face") {
                 StyleChooser(selection: $face) { style in
@@ -191,7 +193,7 @@ private struct ExternalLink: View {
                 Spacer(minLength: 8)
                 Image(systemName: "arrow.up.right")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
             }
             .contentShape(Rectangle())

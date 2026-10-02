@@ -133,10 +133,6 @@ struct ActionBar: View {
     let store: GameStore
     let ui: AppUI
     var withStats = false
-    #if os(macOS)
-    @State private var showingMore = false
-    @Environment(\.openWindow) private var openWindow
-    #endif
 
     var body: some View {
         HStack(spacing: 16) {
@@ -178,35 +174,10 @@ struct ActionBar: View {
         .buttonStyle(BarButtonStyle())
     }
 
-    /// How to Play, Settings… and About Solitaire (spec "Settings, About and the More menu").
-    @ViewBuilder
+    /// More opens a dark card of tiles: How to Play, Settings and About (spec "Settings, About
+    /// and the More menu").
     private var moreControl: some View {
-        #if os(iOS)
-        Menu {
-            Button("How to Play", systemImage: "questionmark.circle") { ui.showingHelp = true }
-            Button("Settings…", systemImage: "gearshape") { ui.showingSettings = true }
-            Button("About Solitaire", systemImage: "info.circle") { ui.showingAbout = true }
-        } label: {
-            BarLabel(title: "More", symbol: "ellipsis.circle")
-        }
-        .menuStyle(.button)
-        #else
-        Button { showingMore = true } label: { BarLabel(title: "More", symbol: "ellipsis.circle") }
-            .popover(isPresented: $showingMore, arrowEdge: .top) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Button("How to Play") {
-                        showingMore = false
-                        openWindow(id: HelpCommands.windowID)
-                    }
-                    SettingsLink { Text("Settings…") }
-                    Button("About Solitaire") {
-                        showingMore = false
-                        openWindow(id: AboutCommands.windowID)
-                    }
-                }
-                .padding(16)
-            }
-        #endif
+        Button { ui.showingMore = true } label: { BarLabel(title: "More", symbol: "ellipsis.circle") }
     }
 }
 

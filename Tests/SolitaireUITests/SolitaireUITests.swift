@@ -45,8 +45,13 @@ final class SolitaireUITests: XCTestCase {
         // XCUITest's click on a window never reaches its content.)
         app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 5))
-        // The game is over, so the win sheet offers both modes straight away (nothing to confirm).
-        XCTAssertTrue(app.buttons["New Game: Draw 1"].exists && app.buttons["New Game: Draw 3"].exists)
+        // The win card: both modes straight away (the game is over, nothing to confirm), and Close
+        // leaves the finished board.
+        let card = app.descendants(matching: .any)["winCard"]
+        XCTAssertTrue(card.exists, "the win card")
+        XCTAssertTrue(card.buttons["New Game · Draw 1"].exists && card.buttons["Draw 3 instead"].exists)
+        card.buttons["Close"].press()
+        XCTAssertTrue(app.staticTexts["You won!"].waitForNonExistence(timeout: 5), "Close dismisses it")
     }
 
     /// Left alone, the cascade runs to its end and then the win sheet appears.
@@ -199,6 +204,26 @@ final class SolitaireUITests: XCTestCase {
         ask?.buttons["Cancel"].press()
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 3), "Cancel keeps the game")
         app.buttons["New Game"].firstMatch.press()
+        XCTAssertNotNil(confirmation(app))
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).press()
+        XCTAssertTrue(app.descendants(matching: .any)["confirmation"].waitForNonExistence(timeout: 3),
+                      "a tap on the dimmed table cancels")
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].exists, "and keeps the game")
+        #if os(macOS)
+        // The question is modal: Space (Draw) and ⌘Z (Undo) don't reach the game behind it. Each
+        // is tried on its own (together they would cancel out), and checked once the card is gone
+        // (the board is hidden from accessibility while it is up).
+        for (key, modifiers, name) in [(" ", XCUIElement.KeyModifierFlags(), "Space"), ("z", .command, "⌘Z")] {
+            app.buttons["New Game"].firstMatch.press()
+            XCTAssertNotNil(confirmation(app))
+            app.typeKey(key, modifierFlags: modifiers)
+            sleep(1)
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(app.descendants(matching: .any)["confirmation"].waitForNonExistence(timeout: 3), "Esc cancels")
+            XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].exists, "\(name) didn't reach the game")
+        }
+        #endif
+        app.buttons["New Game"].firstMatch.press()
         confirmation(app)?.buttons["New Game"].press()
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5), "confirmed: a new deal")
     }
@@ -246,7 +271,7 @@ final class SolitaireUITests: XCTestCase {
     func testClosingTheGameWindowQuits() {
         let app = launch(seed: 4)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
-        more(app, "About Solitaire")
+        more(app, "About")
         XCTAssertTrue(app.windows["About Solitaire"].waitForExistence(timeout: 5))
         let game = app.windows.matching(NSPredicate(format: "title == 'Solitaire'")).firstMatch
         XCTAssertTrue(game.exists, "the game window")
@@ -255,18 +280,36 @@ final class SolitaireUITests: XCTestCase {
     }
     #endif
 
-    /// The question before losing a game: an alert on iPhone and iPad, a sheet on the Mac. Nil if
-    /// none appears within `timeout`.
+    #if os(iOS)
+    /// The cards follow Larger Text, and at the largest accessibility size the card still fits on
+    /// screen (it scrolls rather than running off).
+    func testCardsFollowLargerText() {
+        func titleHeight(_ arguments: [String]) -> (CGFloat, Bool) {
+            let app = launch(seed: 4, arguments: arguments)
+            let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+            XCTAssertTrue(stock.waitForExistence(timeout: 5))
+            stock.press()
+            app.buttons["New Game"].firstMatch.press()
+            guard let card = confirmation(app) else { XCTFail("no question"); return (0, false) }
+            let title = card.staticTexts["Start a new game?"]
+            let fits = app.windows.firstMatch.frame.contains(card.frame)
+            let height = title.frame.height
+            app.terminate()
+            return (height, fits)
+        }
+        let (standard, _) = titleHeight([])
+        let (larger, fits) = titleHeight(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertGreaterThan(larger, standard * 1.4, "the title grows with Larger Text")
+        XCTAssertTrue(fits, "the card stays on screen")
+    }
+    #endif
+
+    /// The question before losing a game: the dark card (spec "Colours and dialogs"). Nil if none
+    /// appears within `timeout`.
     @discardableResult
     private func confirmation(_ app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement? {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            for query in [app.alerts, app.sheets, app.dialogs] where query.firstMatch.exists {
-                return query.firstMatch
-            }
-            usleep(200_000)
-        } while Date() < deadline
-        return nil
+        let card = app.descendants(matching: .any)["confirmation"]
+        return card.waitForExistence(timeout: timeout) ? card : nil
     }
 
     /// The seven face-up column cards, which identify a deal.
@@ -324,7 +367,7 @@ final class SolitaireUITests: XCTestCase {
     func testSettingsChooseTheCardStyleAndRememberIt() {
         var app = launch(seed: 4)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
-        more(app, "Settings…")
+        more(app, "Settings")
         let night = app.buttons["Night"].firstMatch
         XCTAssertTrue(night.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Three cards"].exists, "the draw mode is the chip's, not a setting")
@@ -335,7 +378,7 @@ final class SolitaireUITests: XCTestCase {
         app.terminate()
         app = launch(seed: 4, reset: false)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
-        more(app, "Settings…")
+        more(app, "Settings")
         XCTAssertTrue(app.buttons["Night"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Night"].firstMatch.isSelected, "remembered")
         XCTAssertTrue(app.buttons["Art Deco"].firstMatch.isSelected, "remembered")
@@ -346,7 +389,7 @@ final class SolitaireUITests: XCTestCase {
     func testUnknownSavedCardStyleFallsBackToTheDefault() {
         let app = launch(seed: 4, arguments: ["-cardFace", "tartan", "-cardBack", "plaid"])
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
-        more(app, "Settings…")
+        more(app, "Settings")
         XCTAssertTrue(app.buttons["Classic"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Classic"].firstMatch.isSelected, "face falls back to Classic")
         XCTAssertTrue(app.buttons["Classic Blue"].firstMatch.isSelected, "back falls back to Classic Blue")
@@ -356,7 +399,7 @@ final class SolitaireUITests: XCTestCase {
     func testAboutShowsTheVersionAndLinks() {
         let app = launch(seed: 4)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
-        more(app, "About Solitaire")
+        more(app, "About")
         // iOS exposes static text as its label, macOS as its value.
         let version = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
                                                            "Version 1.0", "Version 1.0")).firstMatch
@@ -373,7 +416,7 @@ final class SolitaireUITests: XCTestCase {
         let stock = app.descendants(matching: .any)["Stock, 24 cards"]
         XCTAssertTrue(stock.waitForExistence(timeout: 5))
         XCTAssertEqual(stockSide(app), "left", "left by default")
-        more(app, "Settings…")
+        more(app, "Settings")
         let toggle = settingsSwitch(app, "Draw pile on the right")
         XCTAssertNotNil(toggle)
         toggle?.press()
@@ -425,14 +468,37 @@ final class SolitaireUITests: XCTestCase {
         sleep(1)
     }
 
-    /// Opens More and chooses `item` (a menu on iPhone, a popover on the Mac).
+    /// Opens More and chooses `item`, a tile on the More card.
     private func more(_ app: XCUIApplication, _ item: String) {
         let button = app.buttons["More"].firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         button.press()
-        let entry = app.buttons[item].firstMatch
+        let card = app.descendants(matching: .any)["moreCard"]
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "the More card")
+        let entry = card.buttons[item].firstMatch
         XCTAssertTrue(entry.waitForExistence(timeout: 5), item)
         entry.press()
+        XCTAssertTrue(card.waitForNonExistence(timeout: 5), "choosing a tile closes the card")
+    }
+
+    /// More is a dark card of tiles (spec "Settings, About and the More menu"); Close and a tap on
+    /// the dimmed table both close it without opening anything.
+    func testMoreIsACardOfTiles() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        let card = app.descendants(matching: .any)["moreCard"]
+        app.buttons["More"].firstMatch.press()
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        for tile in ["How to Play", "Settings", "About"] {
+            XCTAssertTrue(card.buttons[tile].exists, tile)
+        }
+        card.buttons["Close"].press()
+        XCTAssertTrue(card.waitForNonExistence(timeout: 3), "Close")
+        app.buttons["More"].firstMatch.press()
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).press()
+        XCTAssertTrue(card.waitForNonExistence(timeout: 3), "a tap outside")
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].exists, "nothing else happened")
     }
 
     /// A tap on the stock draws; undo puts it back.

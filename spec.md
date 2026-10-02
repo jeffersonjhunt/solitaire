@@ -159,6 +159,32 @@ Cards are drawn in SwiftUI, not images, in the face and back the player has chos
 
 The table is a dark green gradient that the card faces stay readable against in light and dark mode. Card faces do not invert in dark mode. Moves animate with a 0.2 s `.easeOut`; flips use a 0.25 s rotation on the Y axis. All motion is skipped when `accessibilityReduceMotion` is on.
 
+## Colours and dialogs
+
+Decided from the 1.1 mockups (design canvas, "1.1 — every dialog and screen").
+
+- **Orange, not gold.** Burnt orange #CC5500 is the one accent: as a fill it always carries
+  near-black text #0A0A0A (5:1), like the Finish button, and it colours switches and selection
+  rings. Orange *text* uses a shade that reads on its background: #B04800 on light sheets
+  (5.2:1 on white) and #FF8A3D on dark ones (7.8:1 on #141414). The app's accent colour (system
+  buttons such as Done, links) is #B04800 in light appearance and #FF8A3D in dark.
+- **The win sheet and the "lose this game?" questions are dark cards** over the table dimmed to
+  40 % (a black scrim at 60 %): card #141414 with a #2A2A2A hairline, 24–28 pt corners, title
+  #F4F1EC, body #C8C3BD, small Space Mono labels #9A9590. Buttons are at least 44 pt tall: the
+  main one orange with dark text, others outlined (#4A4642) with light text. They replace the
+  system alert and sheet on every platform. Return chooses the main button and Esc cancels;
+  VoiceOver treats the card as modal and starts at its title. Tapping the dimmed table outside a
+  question cancels it; outside the win card it does nothing.
+- **Win card:** the draw mode as a small label, "You won!", the figures in Space Mono (MOVES and
+  TIME; PASSES, UNDOS and the score join with 1.1's later units), then **New Game · Draw n** in
+  the same mode (orange), **Draw m instead**, and **Close**. On iPhone it sits at the bottom of
+  the screen; on iPad, the Mac and a phone held sideways it is centred, at most 480 pt wide, with
+  its buttons in one row — Close and the other mode at their labels' width, the main button taking
+  the rest so its label is never cut.
+- **Question cards:** a small label (NEW GAME, or DRAW 1 → DRAW 3), the title, the message, then
+  **Cancel** (outlined) and the confirming button (orange), centred.
+- **Settings, About and How to Play** stay system sheets and forms, with the orange accent.
+
 ## Card styles
 
 The player chooses a card face and a card back, independently, in Settings (see "Settings, About and
@@ -201,8 +227,12 @@ Rules every style keeps:
 
 ## Settings, About and the More menu
 
-**More** (the fourth button of the bottom bar) offers three items on every platform: **How to Play**,
-**Settings…** and **About Solitaire**. On iPhone it is a menu; on iPad and the Mac a popover. On
+**More** (the fourth button of the bottom bar) opens a dark card of tiles on every platform (spec
+"Colours and dialogs"; option B of the 1.1 mockups): **How to Play**, **Settings** and **About**,
+each an orange icon over its label on a #1E1E1E tile, with Close below (Scores joins in 1.1's
+Top 10 unit). On a phone held upright the card rises from the bottom; elsewhere it is centred.
+Choosing a tile closes the card and opens that screen; Close, Esc or a tap on the dimmed table
+just closes it. On
 the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ About Solitaire opens About.
 
 **Settings** — a sheet on iPhone and iPad, the Settings window on the Mac:
@@ -234,7 +264,8 @@ question, because nothing would be lost.
   starts a new game".
 - **On the Mac:** Game ▸ Draw Three switches as the chip does; File ▸ New Game: Draw 1 / Draw 3
   deal in that mode; each asks first when a game is in progress.
-- **The win sheet** keeps New Game: Draw 1 / Draw 3 — the game is over, so nothing is asked.
+- **The win card** offers New Game in the same mode and the other mode — the game is over, so
+  nothing is asked.
 
 The mode of the last deal is remembered and used for the next New Game and the next launch's
 fresh deal. Cancel leaves the game, its mode and its timer untouched. Asking stops auto-finish
@@ -274,7 +305,7 @@ Build the engine and its tests before any view. The app is done when all of thes
 - [ ] Every legal move listed in the rules succeeds and every illegal one is refused, covered by unit tests on `canMove`.
 - [ ] Draw 3 leaves only the waste's top card playable; redeal restores the stock in reverse order.
 - [ ] Undo from any point returns the exact previous state, including face-up flips and redeals, for 100 random moves from a fixed seed.
-- [ ] A game played to a win from a known-solvable seed sets `isWon` and shows the win sheet with the move count and time.
+- [ ] A game played to a win from a known-solvable seed sets `isWon` and shows the win card with the move count and time.
 - [ ] Tap-to-move never produces a no-op, and dragging a king onto an empty column from the bottom of another column is possible by drag but not offered by tap.
 - [ ] Force-quitting mid-game and relaunching restores the same board, move count and elapsed time.
 - [ ] The board lays out without clipping on iPhone SE portrait, iPhone Pro Max landscape, iPad split view at one third width, and a 600 pt wide Mac window.
