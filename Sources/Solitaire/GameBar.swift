@@ -85,6 +85,7 @@ struct GameHeader: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(ChipButtonStyle())
+        .focusable(false)                                       // see ActionBar.buttons
         .padding(.vertical, -8)
         .accessibilityLabel(chip.spoken)
         .accessibilityHint(chip.hint)
@@ -153,19 +154,26 @@ struct ActionBar: View {
         .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.08)).frame(height: 1) }
     }
 
+    /// Like cards, the controls never take keyboard focus (no focus ring; Space never presses a
+    /// focused button instead of drawing): the keyboard reaches all of them through the menus —
+    /// ⌘Z, ⌘↩, ⌘N, Game ▸ Draw Three, Help and Settings.
     private var buttons: some View {
         HStack(spacing: 4) {
             Button { store.undo() } label: { BarLabel(title: "Undo", symbol: "arrow.uturn.backward") }
                 .disabled(!store.canUndo)                       // also off once the game is won
+                .focusable(false)
             Button { store.autoFinish() } label: { BarLabel(title: "Finish", symbol: "forward") }
                 .buttonStyle(BarButtonStyle(prominent: store.canAutoFinish))
                 .disabled(!store.canAutoFinish)
                 .accessibilityLabel("Auto-finish")
                 .accessibilityInputLabels(["Finish", "Auto-finish"])   // Voice Control: the visible word works
+                .focusable(false)
             Button { ui.requestNewGame(store: store) } label: {
                 BarLabel(title: "New Game", symbol: "plus.rectangle.on.rectangle")
             }
+            .focusable(false)
             moreControl
+                .focusable(false)
         }
         .buttonStyle(BarButtonStyle())
     }

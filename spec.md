@@ -130,7 +130,7 @@ Every platform supports both ways of moving a card: a single tap or click sends 
 
 A drag begins after 8 points of movement so a slow tap is still a tap. The dragged run renders in an overlay above all piles with a slightly stronger shadow, tracks the finger or pointer one-to-one, and animates home in 0.2 s on an illegal drop. Only face-up cards are draggable, and only the top card of the waste or a foundation.
 
-Keyboard and menus on macOS, through `CommandGroup`: New Game (⌘N), New Game: Draw 1 / Draw 3, Undo (⌘Z), Draw (space), Auto-finish (⌘⏎), Draw Three in a Game menu (it switches mode as the draw chip does), and the standard window and help groups. On iPadOS the same shortcuts work from a hardware keyboard via `.keyboardShortcut`. VoiceOver labels every card as rank and suit, and every empty pile by name.
+Keyboard and menus on macOS, through `CommandGroup`: New Game (⌘N), New Game: Draw 1 / Draw 3, Undo (⌘Z), Draw (space), Auto-finish (⌘⏎), Draw Three in a Game menu (it switches mode as the draw chip does), and the standard window and help groups. On iPadOS the same shortcuts work from a hardware keyboard via `.keyboardShortcut`. Like the cards, the on-screen controls (the bar's buttons and the draw chip) never take keyboard focus, so no focus ring is drawn and Space always draws rather than pressing a focused button; the keyboard reaches every one of them through the shortcuts and menus. VoiceOver labels every card as rank and suit, and every empty pile by name.
 
 Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impact on a stock draw, a success notification on a win. Nothing on failure beyond the wiggle. Sound is out of scope for v1.
 
