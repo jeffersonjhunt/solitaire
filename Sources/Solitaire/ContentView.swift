@@ -16,6 +16,7 @@ struct ContentView: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var cardFace = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var cardBack = CardBackStyle.classicBlue
+    @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// A phone held sideways: the header folds into the bar, so the cards keep its height.
@@ -35,6 +36,7 @@ struct ContentView: View {
         }
         .background(TableBackground().ignoresSafeArea())
         .environment(\.cardStyle, CardStyle(face: cardFace, back: cardBack))
+        .environment(\.drawPileSide, drawPileSide)
         #if os(macOS)
         .background(QuitWhenClosed())
         #endif

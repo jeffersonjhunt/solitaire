@@ -147,7 +147,8 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Row gap | Space between the top row and the columns: card width × 0.8, at most 16 pt on a touch board wider than it is tall |
 | Card height | Card width × 1.4 |
 | Corner radius | Card width × 0.09 |
-| Top row | Stock at column 0, waste at column 1, foundations at columns 3 to 6 |
+| Top row | Stock at column 0, waste at column 1, foundations at columns 3 to 6. With **Draw pile on the right** (Settings) the row is mirrored: foundations at columns 0 to 3 (foundation 1 leftmost), waste at column 5, stock at column 6. The tableau never moves. |
+| Draw 3 waste fan | The top three waste cards fan into the empty column between the draw pile and the foundations, 0.3 × card width apart, so the two beneath the playable card show their corner index at their left edge. Draw pile on the left: rightwards from the waste's slot, the playable card furthest right. On the right: the playable card stays on the waste's slot beside the stock, and the two beneath it step leftwards. |
 | Face-down fan | Card height × 0.12 |
 | Face-up fan | Card height × 0.29, scaled down together with the face-down fan when a column would overflow the board |
 | Minimum hit target | 44 pt on touch; cards below that width force a compressed layout |
@@ -206,8 +207,10 @@ the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ Abo
 
 **Settings** — a sheet on iPhone and iPad, the Settings window on the Mac:
 
-- **Game:** resume the game in progress at launch. (The draw mode is not a setting: the draw
-  chip switches it — see "New games and the draw mode".)
+- **Game:** resume the game in progress at launch, and **Draw pile on the right** (off by default:
+  the stock and waste sit on the left). Turning it on mirrors the top row at once, the game in
+  progress included; cards that are moving finish where the new layout puts them. (The draw mode
+  is not a setting: the draw chip switches it — see "New games and the draw mode".)
 - **Card face:** the four faces as tappable previews (an ace of hearts in each), the current one
   ringed in burnt orange (#CC5500).
 - **Card back:** the four backs as tappable previews, ringed the same way.
@@ -259,7 +262,7 @@ The game in progress is saved as JSON to `Application Support/Solitaire/game.jso
 
 On launch the app decodes that file, checks it holds 52 distinct cards and is not already won, and resumes it; anything invalid is discarded silently and a fresh game is dealt. The undo stack is not persisted — a resumed game starts with undo empty.
 
-Settings live in `UserDefaults` via `@AppStorage`: the draw count of the last deal (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic) and the card back (default Classic Blue). An unknown or invalid stored value falls back to the default. New games deal in the remembered draw count; the draw chip changes it (see "New games and the draw mode").
+Settings live in `UserDefaults` via `@AppStorage`: the draw count of the last deal (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic), the card back (default Classic Blue) and the draw pile's side (default left). An unknown or invalid stored value falls back to the default. New games deal in the remembered draw count; the draw chip changes it (see "New games and the draw mode").
 
 On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size. The game window is the app: closing it quits Solitaire (saving as any quit does), and any How to Play, About or Settings window closes with it — so a menu command can never act on a game that is not on screen.
 
@@ -301,3 +304,4 @@ Recorded as they are made; each overrides anything above it conflicts with.
 | 2026-10-01 | Corner index margin (after a look at TestFlight build 202610012043): the index sat almost on the card's top edge. It now has a 0.07 × card width margin above it, as at its left, at full size; to keep D1's promise that it reads in the tightest fan, the minimum face-up fan rises from 0.2 to 0.24 × card height. Portrait boards are unchanged; on a phone held sideways or a short Mac window cards come out about 8 % smaller. |
 | 2026-10-01 | Draw chip and direct New Game (after U12 on TestFlight): the header's draw mode becomes a button that switches mode by dealing a new game, and New Game deals at once in the current mode — no chooser. Both ask before replacing a game in progress (a move made, not won), never otherwise. Settings drops the draw picker and the chip drops "· NEXT n": one place to change the mode, always showing the game being played. |
 | 2026-10-01 | Closing the Mac's game window quits the app (U13 review): with the window gone, ⌘N's question had nowhere to appear and surfaced later. |
+| 2026-10-02 | Draw pile on the right (tester feedback): a setting mirrors the top row — stock and waste on the right, foundations on the left; left stays the default. Only the top row mirrors (the tableau is the same either way), and the Draw 3 fan opens into the empty column (on the right the playable card stays beside the stock, so the cards beneath it still show their corner index). |

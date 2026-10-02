@@ -366,6 +366,65 @@ final class SolitaireUITests: XCTestCase {
         }
     }
 
+    /// The draw pile on the right (spec "Top row"): set in Settings, applied at once, remembered;
+    /// the stock still draws from there. An unknown saved side reads as left.
+    func testDrawPileCanSitOnTheRight() {
+        var app = launch(seed: 4)
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        XCTAssertEqual(stockSide(app), "left", "left by default")
+        more(app, "Settings…")
+        let toggle = settingsSwitch(app, "Draw pile on the right")
+        XCTAssertNotNil(toggle)
+        toggle?.press()
+        closeSettings(app)
+        XCTAssertEqual(stockSide(app), "right", "moved to the right at once")
+        app.terminate()
+        app = launch(seed: 4, reset: false)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        XCTAssertEqual(stockSide(app), "right", "remembered")
+        app.descendants(matching: .any)["Stock, 24 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5), "draws on the right")
+        app.terminate()
+        app = launch(seed: 4, arguments: ["-drawPileSide", "sideways"])
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        XCTAssertEqual(stockSide(app), "left", "an unknown saved side reads as left")
+    }
+
+    /// Which side the stock is on: "left" when it is wholly left of every foundation, "right" when
+    /// wholly right of them all, nil for anything else (e.g. on top of one).
+    private func stockSide(_ app: XCUIApplication) -> String? {
+        let stock = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Stock'")).firstMatch.frame
+        let foundations = (1...4).map { app.descendants(matching: .any)["Foundation \($0), empty"].frame }
+        if foundations.allSatisfy({ stock.maxX <= $0.minX }) { return "left" }
+        if foundations.allSatisfy({ stock.minX >= $0.maxX }) { return "right" }
+        return nil
+    }
+
+    /// The control of a switch in Settings. iPhone and iPad: the switch inside the labelled row (a
+    /// tap on the row's middle doesn't flip it). Mac: the switch has no label of its own — the
+    /// words are a separate text — so it is the switch on that text's line.
+    private func settingsSwitch(_ app: XCUIApplication, _ label: String) -> XCUIElement? {
+        #if os(macOS)
+        let text = app.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", label, label)).firstMatch
+        guard text.waitForExistence(timeout: 5) else { return nil }
+        return app.switches.allElementsBoundByIndex.first { abs($0.frame.midY - text.frame.midY) < 6 }
+        #else
+        let row = app.switches[label].firstMatch
+        guard row.waitForExistence(timeout: 5) else { return nil }
+        return row.switches.firstMatch.exists ? row.switches.firstMatch : row
+        #endif
+    }
+
+    private func closeSettings(_ app: XCUIApplication) {
+        #if os(macOS)
+        app.typeKey("w", modifierFlags: .command)              // the Settings window is in front
+        #else
+        app.buttons["Done"].firstMatch.press()
+        #endif
+        sleep(1)
+    }
+
     /// Opens More and chooses `item` (a menu on iPhone, a popover on the Mac).
     private func more(_ app: XCUIApplication, _ item: String) {
         let button = app.buttons["More"].firstMatch

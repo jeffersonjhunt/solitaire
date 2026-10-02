@@ -17,8 +17,8 @@ Mac app is sandboxed without a network permission, and nothing leaves the device
 right), one pile per suit, from ace up to king.
 
 **The deal:** seven columns; column 1 has one card, column 7 has seven. Only the last card of each
-column is face up. The other 24 cards are the **stock** (top left); cards you draw go face up on
-the **waste** next to it.
+column is face up. The other 24 cards are the **stock** (top left, or top right if you put the draw
+pile on the right in Settings); cards you draw go face up on the **waste** next to it.
 
 **Moves:**
 
@@ -67,7 +67,8 @@ exactly; a force quit returns to the last save, at most five seconds earlier. On
 game window quits Solitaire (and saves).
 
 The draw mode of your last deal is remembered (default: one card). Settings: whether to resume the game in
-progress at launch (default: yes), and the card face (Classic, Big Index, Vintage, Night; default
+progress at launch (default: yes), whether the draw pile sits on the right (default: left; the
+foundations swap to the left), and the card face (Classic, Big Index, Vintage, Night; default
 Classic) and card back (Classic Blue, Burnt Orange, Racing Green, Art Deco; default Classic
 Blue). Face and back change every card at once, including the game in progress.
 

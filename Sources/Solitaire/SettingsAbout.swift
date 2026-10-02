@@ -1,13 +1,14 @@
 import SolitaireEngine
 import SwiftUI
 
-/// Settings (spec "Settings, About and the More menu"): resuming at launch and the card face and
-/// back, with a live preview. (The draw mode is the draw chip's, not a setting.) A sheet on iPhone and iPad, the Settings window (⌘,) on the Mac.
+/// Settings (spec "Settings, About and the More menu"): resuming at launch, the draw pile's side,
+/// and the card face and back, with a live preview. (The draw mode is the draw chip's, not a setting.) A sheet on iPhone and iPad, the Settings window (⌘,) on the Mac.
 /// Every change is saved and applied at once, the game in progress included.
 struct SettingsView: View {
     @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var face = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var back = CardBackStyle.classicBlue
+    @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
 
     private static let previewAce = Card(suit: .spades, rank: 1, isFaceUp: true)
     private static let previewKing = Card(suit: .hearts, rank: 13, isFaceUp: true)
@@ -31,7 +32,14 @@ struct SettingsView: View {
                 .accessibilityLabel("Preview: \(face.title) face, \(back.title) back")
             }
             Section("Game") {
+                // Named explicitly: in the Mac's grouped form the label is a separate text, and the
+                // switch alone would reach VoiceOver unnamed.
                 Toggle("Resume game at launch", isOn: $resumeOnLaunch)
+                    .accessibilityLabel("Resume game at launch")
+                Toggle("Draw pile on the right", isOn: Binding(
+                    get: { drawPileSide == .right },
+                    set: { drawPileSide = $0 ? .right : .left }))
+                    .accessibilityLabel("Draw pile on the right")
             }
             Section("Card face") {
                 StyleChooser(selection: $face) { style in
