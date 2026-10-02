@@ -45,8 +45,13 @@ final class SolitaireUITests: XCTestCase {
         // XCUITest's click on a window never reaches its content.)
         app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 5))
-        // The game is over, so the win sheet offers both modes straight away (nothing to confirm).
-        XCTAssertTrue(app.buttons["New Game: Draw 1"].exists && app.buttons["New Game: Draw 3"].exists)
+        // The win card: both modes straight away (the game is over, nothing to confirm), and Close
+        // leaves the finished board.
+        let card = app.descendants(matching: .any)["winCard"]
+        XCTAssertTrue(card.exists, "the win card")
+        XCTAssertTrue(card.buttons["New Game · Draw 1"].exists && card.buttons["Draw 3 instead"].exists)
+        card.buttons["Close"].press()
+        XCTAssertTrue(app.staticTexts["You won!"].waitForNonExistence(timeout: 5), "Close dismisses it")
     }
 
     /// Left alone, the cascade runs to its end and then the win sheet appears.
@@ -199,6 +204,12 @@ final class SolitaireUITests: XCTestCase {
         ask?.buttons["Cancel"].press()
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 3), "Cancel keeps the game")
         app.buttons["New Game"].firstMatch.press()
+        XCTAssertNotNil(confirmation(app))
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).press()
+        XCTAssertTrue(app.descendants(matching: .any)["confirmation"].waitForNonExistence(timeout: 3),
+                      "a tap on the dimmed table cancels")
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].exists, "and keeps the game")
+        app.buttons["New Game"].firstMatch.press()
         confirmation(app)?.buttons["New Game"].press()
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5), "confirmed: a new deal")
     }
@@ -255,18 +266,12 @@ final class SolitaireUITests: XCTestCase {
     }
     #endif
 
-    /// The question before losing a game: an alert on iPhone and iPad, a sheet on the Mac. Nil if
-    /// none appears within `timeout`.
+    /// The question before losing a game: the dark card (spec "Colours and dialogs"). Nil if none
+    /// appears within `timeout`.
     @discardableResult
     private func confirmation(_ app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement? {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            for query in [app.alerts, app.sheets, app.dialogs] where query.firstMatch.exists {
-                return query.firstMatch
-            }
-            usleep(200_000)
-        } while Date() < deadline
-        return nil
+        let card = app.descendants(matching: .any)["confirmation"]
+        return card.waitForExistence(timeout: timeout) ? card : nil
     }
 
     /// The seven face-up column cards, which identify a deal.

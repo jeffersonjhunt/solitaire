@@ -19,6 +19,7 @@ struct ContentView: View {
     @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// A phone held sideways: the header folds into the bar, so the cards keep its height.
     private var shortScreen: Bool { verticalSizeClass == .compact }
     #else
@@ -78,24 +79,39 @@ struct ContentView: View {
             }
         }
         #endif
-        // New Game, the draw chip and the menus ask here before losing a game in progress.
-        .alert(ui.pendingNewGame?.title ?? "",
-               isPresented: Binding(get: { ui.pendingNewGame != nil }, set: { if !$0 { ui.pendingNewGame = nil } }),
-               presenting: ui.pendingNewGame) { request in
-            Button(request.confirm, role: .destructive) {
-                ui.pendingNewGame = nil
-                store.newGame(drawCount: request.drawCount)
+        // New Game, the draw chip and the menus ask here before losing a game in progress; the
+        // win card follows the cascade. Both are dark cards over the dimmed table.
+        .overlay {
+            if let request = ui.pendingNewGame {
+                DialogScrim(outside: { ui.pendingNewGame = nil }) {
+                    QuestionCard(request: request, cancel: { ui.pendingNewGame = nil }) {
+                        ui.pendingNewGame = nil
+                        store.newGame(drawCount: request.drawCount)
+                    }
+                }
+                .transition(.opacity)
+            } else if winSheetShown.wrappedValue {
+                DialogScrim(bottom: !wideDialogs) {
+                    WinCard(drawCount: store.state.drawCount, moves: store.state.moveCount,
+                            elapsed: store.state.elapsed, wide: wideDialogs,
+                            newGame: { store.newGame(drawCount: $0) },
+                            close: { dismissedWinSeed = store.state.seed })
+                }
+                .transition(.opacity)
             }
-            Button("Cancel", role: .cancel) { ui.pendingNewGame = nil }
-        } message: { request in
-            Text(request.message)
         }
-        .sheet(isPresented: winSheetShown) {
-            WinSheet(moves: store.state.moveCount, elapsed: store.state.elapsed,
-                     lastDrawCount: store.lastDrawCount) { count in
-                store.newGame(drawCount: count)
-            }
-        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: ui.pendingNewGame)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: winSheetShown.wrappedValue)
+    }
+
+    /// Cards centred with their buttons in a row (iPad, the Mac, a phone held sideways), rather
+    /// than anchored to the bottom with stacked buttons (a phone held upright).
+    private var wideDialogs: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .regular || verticalSizeClass == .compact
+        #else
+        true
+        #endif
     }
 
     private var winSheetShown: Binding<Bool> {
@@ -123,41 +139,6 @@ struct ContentView: View {
 struct TableBackground: View {
     var body: some View {
         LinearGradient(colors: [Color("TableTop"), Color("TableBottom")], startPoint: .top, endPoint: .bottom)
-    }
-}
-
-/// The win sheet: move count and time, and a new game — asking for the draw count like every other
-/// way of starting one (the remembered mode is the default button).
-struct WinSheet: View {
-    let moves: Int
-    let elapsed: TimeInterval
-    let lastDrawCount: Int
-    let newGame: (Int) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("You won!").font(.largeTitle.bold())
-            HStack(spacing: 24) {
-                Label("\(moves) moves", systemImage: "arrow.left.arrow.right")
-                Label(GameHeader.clock(elapsed), systemImage: "clock")
-                    .accessibilityLabel("Time \(GameHeader.spokenClock(elapsed))")
-            }
-            .font(.title3.monospacedDigit())
-            HStack {
-                Button("Close") { dismiss() }
-                ForEach([1, 3], id: \.self) { count in
-                    let button = Button("New Game: Draw \(count)") { newGame(count) }
-                    if count == lastDrawCount {
-                        button.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-                    } else {
-                        button.buttonStyle(.bordered)
-                    }
-                }
-            }
-        }
-        .padding(32)
-        .presentationDetents([.medium])
     }
 }
 

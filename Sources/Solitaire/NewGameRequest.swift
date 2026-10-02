@@ -13,6 +13,8 @@ struct NewGameRequest: Equatable {
         switching ? "This starts a new game, and the current one will be lost." : "This one will be lost."
     }
     var confirm: String { switching ? "Start New Game" : "New Game" }
+    /// The small label over the card's title.
+    var kicker: String { switching ? "DRAW \(drawCount == 3 ? 1 : 3) → DRAW \(drawCount)" : "NEW GAME" }
 }
 
 extension AppUI {
