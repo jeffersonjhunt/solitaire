@@ -227,8 +227,12 @@ Rules every style keeps:
 
 ## Settings, About and the More menu
 
-**More** (the fourth button of the bottom bar) offers three items on every platform: **How to Play**,
-**Settings…** and **About Solitaire**. On iPhone it is a menu; on iPad and the Mac a popover. On
+**More** (the fourth button of the bottom bar) opens a dark card of tiles on every platform (spec
+"Colours and dialogs"; option B of the 1.1 mockups): **How to Play**, **Settings** and **About**,
+each an orange icon over its label on a #1E1E1E tile, with Close below (Scores joins in 1.1's
+Top 10 unit). On a phone held upright the card rises from the bottom; elsewhere it is centred.
+Choosing a tile closes the card and opens that screen; Close, Esc or a tap on the dimmed table
+just closes it. On
 the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ About Solitaire opens About.
 
 **Settings** — a sheet on iPhone and iPad, the Settings window on the Mac:

@@ -135,29 +135,36 @@ struct GameCommands: Commands {
     let ui: AppUI
 
     var body: some Commands {
+        // Every game command stands down while a card is up, so nothing changes behind it.
         CommandGroup(replacing: .newItem) {
-            Button("New Game") { ui.requestNewGame(store: store) }
-                .keyboardShortcut("n")
-            Divider()
-            Button("New Game: Draw 1") { ui.requestNewGame(drawCount: 1, store: store) }
-            Button("New Game: Draw 3") { ui.requestNewGame(drawCount: 3, store: store) }
+            Group {
+                Button("New Game") { ui.requestNewGame(store: store) }
+                    .keyboardShortcut("n")
+                Divider()
+                Button("New Game: Draw 1") { ui.requestNewGame(drawCount: 1, store: store) }
+                Button("New Game: Draw 3") { ui.requestNewGame(drawCount: 3, store: store) }
+            }
+            .disabled(ui.cardIsShowing)
         }
         CommandGroup(replacing: .undoRedo) {
             Button("Undo") { store.undo() }
                 .keyboardShortcut("z")
-                .disabled(!store.canUndo)
+                .disabled(!store.canUndo || ui.cardIsShowing)
         }
         CommandMenu("Game") {
-            Button("Draw") { store.tapStock() }
-                .keyboardShortcut(.space, modifiers: [])
-            Button("Auto-finish") { store.autoFinish() }
-                .keyboardShortcut(.return)
-                .disabled(!store.canAutoFinish)
-            Divider()
-            // Switches as the draw chip does: a new deal in the other mode, asked first mid-game.
-            Toggle("Draw Three", isOn: Binding(
-                get: { store.state.drawCount == 3 },
-                set: { ui.requestNewGame(drawCount: $0 ? 3 : 1, store: store) }))
+            Group {
+                Button("Draw") { store.tapStock() }
+                    .keyboardShortcut(.space, modifiers: [])
+                Button("Auto-finish") { store.autoFinish() }
+                    .keyboardShortcut(.return)
+                    .disabled(!store.canAutoFinish)
+                Divider()
+                // Switches as the draw chip does: a new deal in the other mode, asked first mid-game.
+                Toggle("Draw Three", isOn: Binding(
+                    get: { store.state.drawCount == 3 },
+                    set: { ui.requestNewGame(drawCount: $0 ? 3 : 1, store: store) }))
+            }
+            .disabled(ui.cardIsShowing)
         }
     }
 }
@@ -172,6 +179,13 @@ final class AppUI {
     var showingAbout = false
     /// A new deal waiting for the player to confirm losing the game in progress.
     var pendingNewGame: NewGameRequest?
+    /// The win card is on screen (set by ContentView, which decides when it shows).
+    var showingWinCard = false
+    /// The More card is open.
+    var showingMore = false
+    /// A dark card (a question or the win card) is up: it is modal, so the game's menu commands
+    /// and shortcuts stand down until it closes (spec "Colours and dialogs").
+    var cardIsShowing: Bool { pendingNewGame != nil || showingWinCard || showingMore }
 }
 
 /// Help ▸ Solitaire Help (⌘?): the How to Play window on the Mac, the help sheet on iPad with a

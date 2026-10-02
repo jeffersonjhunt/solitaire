@@ -35,6 +35,19 @@ import Testing
     }
 }
 
+/// A card is modal: the game's menu commands stand down while either kind is up.
+@MainActor @Suite struct CardsAreModal {
+    @Test func eitherCardCounts() {
+        let ui = AppUI()
+        #expect(!ui.cardIsShowing)
+        ui.pendingNewGame = NewGameRequest(drawCount: 1, switching: false)
+        #expect(ui.cardIsShowing, "a question")
+        ui.pendingNewGame = nil
+        ui.showingWinCard = true
+        #expect(ui.cardIsShowing, "the win card")
+    }
+}
+
 @Suite struct QuestionLabels {
     @Test func theLabelSaysWhatTheQuestionIsAbout() {
         #expect(NewGameRequest(drawCount: 1, switching: false).kicker == "NEW GAME")

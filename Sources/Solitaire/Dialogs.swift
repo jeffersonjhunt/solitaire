@@ -27,7 +27,8 @@ struct DialogButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         configuration.label
-            .font(.system(size: kind == .main ? 17 : 16, weight: kind == .plain ? .regular : (kind == .main ? .bold : .semibold)))
+            // Text styles, so the buttons follow Larger Text (17 / 16 pt at the default size).
+            .font(kind == .main ? .headline.weight(.bold) : kind == .outlined ? .callout.weight(.semibold) : .callout)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .foregroundStyle(kind == .main ? TableColors.onAccent : kind == .plain ? DialogColors.body : DialogColors.title)
@@ -41,6 +42,10 @@ struct DialogButtonStyle: ButtonStyle {
                 }
             }
             .contentShape(shape)
+            #if os(iOS)
+            .contentShape(.hoverEffect, shape)          // iPad pointer: the button's own shape lights
+            .hoverEffect(.highlight)
+            #endif
             .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
@@ -69,21 +74,29 @@ struct DialogScrim<Card: View>: View {
 }
 
 /// The card itself: #141414, hairline edge, large corners and a soft shadow. Modal for VoiceOver.
+/// Its text follows Larger Text; when that makes it taller than the screen, it scrolls.
 struct DialogCard<Content: View>: View {
     var cornerRadius: CGFloat = 24
     let identifier: String
     @ViewBuilder let content: () -> Content
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            stack
+            ScrollView { stack }.scrollBounceBehavior(.basedOnSize)
+        }
+        .background(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(DialogColors.card))
+        .overlay(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).strokeBorder(DialogColors.hairline))
+        .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
+        .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var stack: some View {
         VStack(alignment: .leading, spacing: 12, content: content)
             .padding(EdgeInsets(top: 24, leading: 20, bottom: 18, trailing: 20))
-            .background(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(DialogColors.card))
-            .overlay(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).strokeBorder(DialogColors.hairline))
-            .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
-            .environment(\.colorScheme, .dark)
-            .accessibilityElement(children: .contain)
-            .accessibilityAddTraits(.isModal)
-            .accessibilityIdentifier(identifier)
     }
 }
 
@@ -110,12 +123,12 @@ struct QuestionCard: View {
         DialogCard(identifier: "confirmation") {
             DialogKicker(text: request.kicker)
             Text(request.title)
-                .font(.system(size: 22, weight: .bold))
+                .font(.title2.bold())
                 .foregroundStyle(DialogColors.title)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityFocused($titleFocused)
             Text(request.message)
-                .font(.system(size: 16))
+                .font(.callout)
                 .foregroundStyle(DialogColors.body)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 10) {
@@ -152,7 +165,7 @@ struct WinCard: View {
             VStack(spacing: 6) {
                 DialogKicker(text: "DRAW \(drawCount)")
                 Text("You won!")
-                    .font(.system(size: 30, weight: .bold))
+                    .font(.largeTitle.bold())
                     .foregroundStyle(DialogColors.title)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($titleFocused)
@@ -205,5 +218,92 @@ struct WinCard: View {
             }
         }
         .focusable(false)
+    }
+}
+
+/// More (spec "Settings, About and the More menu"): a dark card of tiles — icon over label, like
+/// the bar's buttons — that opens How to Play, Settings or About and closes itself. On a phone
+/// held upright it rises from the bottom; elsewhere it is centred.
+struct MoreCard: View {
+    let ui: AppUI
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    #endif
+    @AccessibilityFocusState private var labelFocused: Bool
+
+    var body: some View {
+        DialogCard(cornerRadius: 28, identifier: "moreCard") {
+            DialogKicker(text: "MORE")
+                .frame(maxWidth: .infinity)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($labelFocused)
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    tile("How to Play", symbol: "questionmark.circle") { open(.help) }
+                    tile("Settings", symbol: "gearshape") { open(.settings) }
+                }
+                GridRow {
+                    tile("About", symbol: "info.circle") { open(.about) }
+                        .gridCellColumns(2)
+                }
+            }
+            Button("Close") { ui.showingMore = false }
+                .buttonStyle(DialogButtonStyle(kind: .plain, height: 44))
+                .keyboardShortcut(.cancelAction)
+                .focusable(false)
+        }
+        .onAppear { labelFocused = true }
+    }
+
+    private enum Destination { case help, settings, about }
+
+    private func open(_ destination: Destination) {
+        ui.showingMore = false
+        #if os(macOS)
+        switch destination {
+        case .help: openWindow(id: HelpCommands.windowID)
+        case .settings: openSettings()
+        case .about: openWindow(id: AboutCommands.windowID)
+        }
+        #else
+        switch destination {
+        case .help: ui.showingHelp = true
+        case .settings: ui.showingSettings = true
+        case .about: ui.showingAbout = true
+        }
+        #endif
+    }
+
+    private func tile(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.title2)
+                    .foregroundStyle(DialogColors.orangeText)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DialogColors.title)
+            }
+            .frame(maxWidth: .infinity, minHeight: 92)
+        }
+        .buttonStyle(TileButtonStyle())
+        .focusable(false)
+    }
+}
+
+/// A More tile: #1E1E1E with the card's hairline, dimming while pressed.
+struct TileButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        configuration.label
+            .background(shape.fill(Color(hex: 0x1E1E1E)))
+            .overlay(shape.strokeBorder(DialogColors.hairline))
+            .contentShape(shape)
+            #if os(iOS)
+            .contentShape(.hoverEffect, shape)
+            .hoverEffect(.highlight)
+            #endif
+            .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }

@@ -98,10 +98,17 @@ struct ContentView: View {
                             close: { dismissedWinSeed = store.state.seed })
                 }
                 .transition(.opacity)
+            } else if ui.showingMore {
+                DialogScrim(bottom: !wideDialogs, maxWidth: 420, outside: { ui.showingMore = false }) {
+                    MoreCard(ui: ui)
+                }
+                .transition(.opacity)
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: ui.pendingNewGame)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: ui.showingMore)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: winSheetShown.wrappedValue)
+        .onChange(of: winSheetShown.wrappedValue, initial: true) { _, shown in ui.showingWinCard = shown }
     }
 
     /// Cards centred with their buttons in a row (iPad, the Mac, a phone held sideways), rather
