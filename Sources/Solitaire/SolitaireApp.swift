@@ -112,6 +112,8 @@ enum AppSettings {
     /// The card face and back (spec "Card styles"); an unknown stored value reads as the default.
     static let cardFaceKey = "cardFace"
     static let cardBackKey = "cardBack"
+    /// Which side the draw pile sits on ("left" / "right"; spec "Top row"); unknown reads as left.
+    static let drawPileSideKey = "drawPileSide"
 
     static var defaults: UserDefaults {
         #if DEBUG

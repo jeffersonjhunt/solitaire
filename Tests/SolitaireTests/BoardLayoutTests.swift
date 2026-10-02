@@ -169,13 +169,13 @@ func worstCaseState() -> GameState {
 /// Acceptance: the board lays out without clipping on iPhone SE portrait, iPhone Pro Max
 /// landscape, iPad split view at one third, and a 600 pt wide Mac window.
 @Suite struct NoClipping {
-    @Test(arguments: BoardSize.allCases)
-    func everyCardFitsTheBoard(_ board: BoardSize) {
+    @Test(arguments: BoardSize.allCases, DrawPileSide.allCases)
+    func everyCardFitsTheBoard(_ board: BoardSize, _ side: DrawPileSide) {
         let m = BoardMetrics(size: board.size, isTouch: board.isTouch)
         for (name, state) in [("deal", SolitaireEngine.newGame(drawCount: 3, seed: 4)), ("worst", worstCaseState())] {
             var s = state
             if name == "deal" { SolitaireEngine.drawFromStock(&s) }   // three cards on the waste, fanned
-            let layout = BoardLayout(state: s, metrics: m)
+            let layout = BoardLayout(state: s, metrics: m, side: side)
             let bounds = CGRect(origin: .zero, size: board.size).insetBy(dx: -0.001, dy: -0.001)
             for p in layout.placements {
                 #expect(bounds.contains(p.frame), "\(board) \(name): \(p.card.id) at \(p.frame)")
@@ -462,5 +462,72 @@ func worstCaseState() -> GameState {
     func winSheetTiming(_ c: (Bool, Bool, Bool, Bool, Bool, Bool)) {
         #expect(ContentView.showsWinSheet(isWon: c.0, dismissed: c.1, cascadeFinished: c.2,
                                           reduceMotion: c.3, voiceOver: c.4) == c.5)
+    }
+}
+
+/// Spec "Top row": the draw pile on the left (default) or the right, where the top row mirrors —
+/// foundations in columns 0–3, waste 5, stock 6 — and the tableau stays put.
+@Suite struct DrawPileSides {
+    let m = BoardMetrics(size: CGSize(width: 800, height: 900), isTouch: false)
+
+    /// A Draw 3 game with five cards on the waste: two buried, three fanned.
+    func fiveOnTheWaste() -> GameState {
+        var s = SolitaireEngine.newGame(drawCount: 3, seed: 4)
+        s.waste = Array(s.stock.suffix(5)).map { var c = $0; c.isFaceUp = true; return c }
+        s.stock.removeLast(5)
+        return s
+    }
+
+    @Test func leftIsTheDefaultLayout() {
+        let s = fiveOnTheWaste()
+        #expect(BoardLayout(state: s, metrics: m) == BoardLayout(state: s, metrics: m, side: .left))
+        let l = BoardLayout(state: s, metrics: m)
+        #expect(l.slot(.stock).minX == m.columnX(0) && l.slot(.waste).minX == m.columnX(1))
+        #expect((0..<4).allSatisfy { l.slot(.foundation($0)).minX == m.columnX(3 + $0) })
+    }
+
+    @Test func onTheRightTheTopRowMirrorsAndTheTableauStays() {
+        let s = fiveOnTheWaste()
+        let r = BoardLayout(state: s, metrics: m, side: .right)
+        let l = BoardLayout(state: s, metrics: m, side: .left)
+        #expect(r.slot(.stock).minX == m.columnX(6) && r.slot(.waste).minX == m.columnX(5))
+        #expect((0..<4).allSatisfy { r.slot(.foundation($0)).minX == m.columnX($0) }, "foundation 1 leftmost")
+        #expect([r.slot(.stock), r.slot(.waste)].allSatisfy { $0.minY == m.topRowY })
+        let tableau = { (b: BoardLayout) in b.placements.filter { if case .tableau = $0.pile { true } else { false } } }
+        #expect(tableau(r) == tableau(l), "the columns don't move")
+    }
+
+    /// On the right the playable card stays on the waste's slot, next to the stock; the two below
+    /// it step left by 0.3 × width (so their corner index shows), and buried cards sit under the
+    /// bottom of the fan. The fan stays inside the empty column, clear of the foundations.
+    @Test func theDrawThreeFanOpensIntoTheEmptyColumn() {
+        let s = fiveOnTheWaste()
+        let step = m.cardWidth * 0.3
+        let r = BoardLayout(state: s, metrics: m, side: .right)
+        let rw = r.placements.filter { $0.pile == .waste }.sorted { $0.index < $1.index }
+        let slot = r.slot(.waste).minX
+        #expect(rw.map(\.frame.minX) == [slot - 2 * step, slot - 2 * step, slot - 2 * step, slot - step, slot])
+        #expect(rw.map(\.isExposed) == [false, false, true, true, true])
+        #expect(rw.allSatisfy { $0.frame.minX >= r.slot(.foundation(3)).maxX }, "clear of foundation 4")
+        #expect(rw.last!.zIndex > rw[3].zIndex, "the playable card is on top")
+
+        let l = BoardLayout(state: s, metrics: m, side: .left)
+        let lw = l.placements.filter { $0.pile == .waste }.sorted { $0.index < $1.index }
+        let lslot = l.slot(.waste).minX
+        #expect(lw.map(\.frame.minX) == [lslot, lslot, lslot, lslot + step, lslot + 2 * step])
+        #expect(lw.allSatisfy { $0.frame.maxX <= l.slot(.foundation(0)).minX }, "clear of foundation 1")
+    }
+
+    @Test func dropsLandOnTheMirroredFoundations() {
+        let r = BoardLayout(state: fiveOnTheWaste(), metrics: m, side: .right)
+        for f in 0..<4 {
+            let slot = r.slot(.foundation(f))
+            #expect(r.dropTarget(for: CGPoint(x: slot.midX, y: slot.midY)) == .foundation(f))
+        }
+    }
+
+    @Test func anUnknownSavedSideReadsAsLeft() {
+        #expect(DrawPileSide(rawValue: "sideways") == nil)
+        #expect(DrawPileSide.allCases.map(\.rawValue) == ["left", "right"])
     }
 }

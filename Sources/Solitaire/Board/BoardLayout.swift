@@ -1,4 +1,5 @@
 import CoreGraphics
+import SwiftUI
 import SolitaireEngine
 
 /// Where every card sits for a given state and metrics. All 52 cards are always placed, so a
@@ -15,18 +16,32 @@ struct CardPlacement: Identifiable, Equatable {
     var isOnFoundation: Bool { if case .foundation = pile { true } else { false } }
 }
 
+/// Which end of the top row the stock and waste sit at (spec "Top row"; a setting, left by
+/// default). On the right the row is mirrored: foundations in columns 0–3, waste 5, stock 6.
+enum DrawPileSide: String, CaseIterable, Sendable {
+    case left, right
+}
+
+extension EnvironmentValues {
+    /// The board lays out its top row for this side; the app sets it from the saved setting.
+    @Entry var drawPileSide = DrawPileSide.left
+}
+
 struct BoardLayout: Equatable {
     let metrics: BoardMetrics
     let placements: [CardPlacement]
+    let side: DrawPileSide
 
     /// The empty-pile outline and drop target for every pile.
     func slot(_ pile: PileID) -> CGRect {
         let m = metrics
         let size = CGSize(width: m.cardWidth, height: m.cardHeight)
+        let right = side == .right
         switch pile {
-        case .stock: return CGRect(origin: CGPoint(x: m.columnX(0), y: m.topRowY), size: size)
-        case .waste: return CGRect(origin: CGPoint(x: m.columnX(1), y: m.topRowY), size: size)
-        case .foundation(let f): return CGRect(origin: CGPoint(x: m.columnX(3 + f), y: m.topRowY), size: size)
+        case .stock: return CGRect(origin: CGPoint(x: m.columnX(right ? 6 : 0), y: m.topRowY), size: size)
+        case .waste: return CGRect(origin: CGPoint(x: m.columnX(right ? 5 : 1), y: m.topRowY), size: size)
+        case .foundation(let f):
+            return CGRect(origin: CGPoint(x: m.columnX(right ? f : 3 + f), y: m.topRowY), size: size)
         case .tableau(let t): return CGRect(origin: CGPoint(x: m.columnX(t), y: m.tableauY), size: size)
         }
     }
@@ -57,8 +72,9 @@ struct BoardLayout: Equatable {
     ///   the rest, so a card travelling to another pile never passes under a deeper column. Whole
     ///   piles are raised, not single cards, so the order within a pile never changes (a new deal
     ///   leaves some cards in the same pile; raising only the others would bury them mid-pile).
-    init(state: GameState, metrics m: BoardMetrics, raised: Set<Int> = []) {
+    init(state: GameState, metrics m: BoardMetrics, raised: Set<Int> = [], side: DrawPileSide = .left) {
         self.metrics = m
+        self.side = side
         var out: [CardPlacement] = []
         func isRaised(_ cards: [Card]) -> Bool { cards.contains { raised.contains($0.id) } }
         func stack(_ cards: [Card], _ pile: PileID, _ origin: CGPoint, z: Double,
@@ -75,13 +91,23 @@ struct BoardLayout: Equatable {
                     isExposed: i >= firstExposed))
             }
         }
-        let empty = BoardLayout(metrics: m, placements: [])
+        let empty = BoardLayout(metrics: m, placements: [], side: side)
         stack(state.stock, .stock, empty.slot(.stock).origin, z: 0)
-        // Draw 3 fans the top three waste cards to the right, into the empty third column.
+        // Draw 3 fans the top three waste cards into the empty column beside the waste, each card
+        // 0.3 × width from the next, so the two beneath the playable top card show their corner
+        // index at their left edge. With the draw pile on the left the fan opens rightwards from
+        // the waste's slot (the top card furthest right); on the right the top card stays on the
+        // slot, next to the stock, and the two beneath it step leftwards. Buried cards sit under
+        // the bottom of the fan.
         let fanned = state.drawCount == 3 ? 3 : 1
         let firstFanned = max(state.waste.count - fanned, 0)
+        let lastIndex = state.waste.count - 1
         stack(state.waste, .waste, empty.slot(.waste).origin, z: 100, exposedFrom: firstFanned) { i in
-            CGSize(width: CGFloat(max(i - firstFanned, 0)) * m.cardWidth * 0.3, height: 0)
+            let step = m.cardWidth * 0.3
+            let k = CGFloat(max(i, firstFanned))
+            return side == .left
+                ? CGSize(width: (k - CGFloat(firstFanned)) * step, height: 0)
+                : CGSize(width: -(CGFloat(lastIndex) - k) * step, height: 0)
         }
         for f in 0..<4 {
             stack(state.foundations[f], .foundation(f), empty.slot(.foundation(f)).origin, z: 200)
@@ -104,9 +130,10 @@ struct BoardLayout: Equatable {
         self.placements = out
     }
 
-    private init(metrics: BoardMetrics, placements: [CardPlacement]) {
+    private init(metrics: BoardMetrics, placements: [CardPlacement], side: DrawPileSide) {
         self.metrics = metrics
         self.placements = placements
+        self.side = side
     }
 }
 

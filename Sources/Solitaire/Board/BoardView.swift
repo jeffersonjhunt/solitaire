@@ -17,6 +17,7 @@ struct BoardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @Environment(\.cardStyle) private var cardStyle
+    @Environment(\.drawPileSide) private var drawPileSide
     @State private var dragTranslation: CGSize = .zero
     /// True while a drag gesture is live; resets on its own when the system cancels the gesture
     /// (which skips `onEnded`), so a cancelled drag still ends and springs home.
@@ -35,7 +36,8 @@ struct BoardView: View {
     var body: some View {
         GeometryReader { geo in
             let metrics = BoardMetrics(size: geo.size, isTouch: Self.isTouch)
-            let layout = BoardLayout(state: store.state, metrics: metrics, raised: store.movedCardIDs)
+            let layout = BoardLayout(state: store.state, metrics: metrics, raised: store.movedCardIDs,
+                                     side: drawPileSide)
             ZStack(alignment: .topLeading) {
                 outlines(layout)
                 ForEach(layout.placements) { p in
