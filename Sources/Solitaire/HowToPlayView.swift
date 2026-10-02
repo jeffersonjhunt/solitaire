@@ -105,7 +105,7 @@ enum HowToPlay {
             "**Click** a card to send it to its best spot (double-click works too); **drag** to place it exactly.",
             "**Click the stock** or press **Space** to draw.",
             "The bar along the bottom: **Undo**, **Finish** (auto-finish, once every card can go home), **New Game** and **More** (How to Play, Settings — with the card faces and backs — and About).",
-            "**DRAW 1 / DRAW 3** at the top switches mode by starting a new game (so does **Game ▸ Draw Three**). Mid-game, it and **New Game** ask first.",
+            "**DRAW 1 / DRAW 3** at the top switches mode by starting a new game (so does **Game ▸ Draw Three**). Mid-game, it and **New Game** ask first (unless you've turned that off in Settings).",
             "**⌘Z** undo · **⌘N** new game · **⌘↩\u{FE0E}** auto-finish · **File ▸ New Game: Draw 1 / Draw 3** · **Settings (⌘,)**.",
             "A card with nowhere to go wiggles. Clicking a card on a foundation does nothing — drag it if you mean to.",
         ]
@@ -114,7 +114,7 @@ enum HowToPlay {
             "**Tap** a card to send it to its best spot; **drag** to place it exactly.",
             "**Tap the stock** to draw.",
             "The bar along the bottom: **Undo**, **Finish** (auto-finish, once every card can go home), **New Game** (same draw mode) and **More** (How to Play, Settings — with the card faces and backs — and About).",
-            "Tap **DRAW 1 / DRAW 3** at the top to switch mode — that starts a new game. Mid-game, it and **New Game** ask first.",
+            "Tap **DRAW 1 / DRAW 3** at the top to switch mode — that starts a new game. Mid-game, it and **New Game** ask first (unless you've turned that off in Settings).",
             "With a keyboard: **⌘Z** undo · **⌘N** new game · **Space** draw · **⌘↩\u{FE0E}** auto-finish.",
             "A card with nowhere to go wiggles. Tapping a card on a foundation does nothing — drag it if you mean to.",
         ]

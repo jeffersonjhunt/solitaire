@@ -37,6 +37,13 @@ import Testing
         #expect(text(.right).contains("**stock** (top right)") && text(.right).contains("**A**, top left"))
     }
 
+    /// Asking before ending a game can be turned off, and the help says so (spec "New games and the
+    /// draw mode").
+    @Test func saysAskingCanBeTurnedOff() {
+        let controls = HowToPlay.sections.first { $0.title == "Controls" }!.lines.joined(separator: "\n")
+        #expect(controls.contains("ask first (unless you've turned that off in Settings)"))
+    }
+
     /// The resume switch is described where it actually is on this platform.
     @Test func pointsToThisPlatformsResumeSetting() {
         let saving = HowToPlay.sections.first { $0.title == "Saving" }!.lines.joined()

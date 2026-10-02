@@ -57,7 +57,8 @@ missed tap never pulls a card back down; drag it if you mean to. Once you win, t
 nothing moves and undo is off.
 
 Starting a new game or switching draw mode while a game is under way asks first, since the current
-game would be lost; on a fresh deal or after a win it just deals.
+game would be lost; on a fresh deal or after a win it just deals. Turn off **Ask before ending a
+game** in Settings and it never asks.
 
 ### Saving and settings
 
@@ -68,7 +69,8 @@ game window quits Solitaire (and saves).
 
 The draw mode of your last deal is remembered (default: one card). Settings: whether to resume the game in
 progress at launch (default: yes), whether the draw pile sits on the right (default: left; the
-foundations swap to the left), and the card face (Classic, Big Index, Vintage, Night; default
+foundations swap to the left), whether to ask before ending a game in progress (default: yes),
+and the card face (Classic, Big Index, Vintage, Night; default
 Classic) and card back (Classic Blue, Burnt Orange, Racing Green, Art Deco; default Classic
 Blue). Face and back change every card at once, including the game in progress.
 

@@ -239,8 +239,9 @@ the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ Abo
 
 - **Game:** resume the game in progress at launch, and **Draw pile on the right** (off by default:
   the stock and waste sit on the left). Turning it on mirrors the top row at once, the game in
-  progress included; cards that are moving finish where the new layout puts them. (The draw mode
-  is not a setting: the draw chip switches it — see "New games and the draw mode".)
+  progress included; cards that are moving finish where the new layout puts them. Then **Ask
+  before ending a game** (on by default; see "New games and the draw mode"). (The draw mode is not
+  a setting: the draw chip switches it.)
 - **Card face:** the four faces as tappable previews (an ace of hearts in each), the current one
   ringed in burnt orange (#CC5500).
 - **Card back:** the four backs as tappable previews, ringed the same way.
@@ -252,7 +253,9 @@ Changes apply immediately and are saved at once.
 
 A game is **in progress** once at least one move (a draw included) has been made and it is not won.
 Only a game in progress is ever asked about; a fresh deal or a won game is replaced without a
-question, because nothing would be lost.
+question, because nothing would be lost. With **Ask before ending a game** off (Settings ▸ Game), a
+game in progress is replaced without a question too: every way of starting a new game (New Game,
+⌘N, the draw chip, the Mac's File and Game menu items, and Hard Core once it exists) deals at once.
 
 - **New Game** (the bar button, ⌘N, File ▸ New Game) deals at once in the current game's draw
   mode. In progress, it first asks: "Start a new game? This one will be lost." — **New Game** /
@@ -293,7 +296,7 @@ The game in progress is saved as JSON to `Application Support/Solitaire/game.jso
 
 On launch the app decodes that file, checks it holds 52 distinct cards and is not already won, and resumes it; anything invalid is discarded silently and a fresh game is dealt. The undo stack is not persisted — a resumed game starts with undo empty.
 
-Settings live in `UserDefaults` via `@AppStorage`: the draw count of the last deal (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic), the card back (default Classic Blue) and the draw pile's side (default left). An unknown or invalid stored value falls back to the default. New games deal in the remembered draw count; the draw chip changes it (see "New games and the draw mode").
+Settings live in `UserDefaults` via `@AppStorage`: the draw count of the last deal (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic), the card back (default Classic Blue), the draw pile's side (default left) and whether to ask before ending a game (`askBeforeEndingGame`, default yes). An unknown or invalid stored value falls back to the default. New games deal in the remembered draw count; the draw chip changes it (see "New games and the draw mode").
 
 On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size. The game window is the app: closing it quits Solitaire (saving as any quit does), and any How to Play, About or Settings window closes with it — so a menu command can never act on a game that is not on screen.
 
