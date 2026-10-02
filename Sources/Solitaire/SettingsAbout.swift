@@ -32,10 +32,14 @@ struct SettingsView: View {
                 .accessibilityLabel("Preview: \(face.title) face, \(back.title) back")
             }
             Section("Game") {
+                // Named explicitly: in the Mac's grouped form the label is a separate text, and the
+                // switch alone would reach VoiceOver unnamed.
                 Toggle("Resume game at launch", isOn: $resumeOnLaunch)
+                    .accessibilityLabel("Resume game at launch")
                 Toggle("Draw pile on the right", isOn: Binding(
                     get: { drawPileSide == .right },
                     set: { drawPileSide = $0 ? .right : .left }))
+                    .accessibilityLabel("Draw pile on the right")
             }
             Section("Card face") {
                 StyleChooser(selection: $face) { style in

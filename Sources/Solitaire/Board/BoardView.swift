@@ -65,6 +65,7 @@ struct BoardView: View {
             }
             .coordinateSpace(.named(Self.space))
             .animation(reduceMotion ? nil : Self.moveAnimation, value: store.state)
+            .animation(reduceMotion ? nil : Self.moveAnimation, value: drawPileSide)   // the top row slides across
             // However a drag ends — dropped, refused, cancelled by the system, or cut short by a
             // state change such as undo — the lifted cards settle: home in 0.2 s, or with the move.
             .onChange(of: store.pendingDrag) { _, drag in

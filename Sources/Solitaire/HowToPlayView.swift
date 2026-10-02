@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The in-app help: the rules of Klondike and this platform's controls. On the Mac it is the
-/// Help ▸ Solitaire Help window (⌘?); on iPhone and iPad a sheet opened from the new-game chooser
+/// Help ▸ Solitaire Help window (⌘?); on iPhone and iPad a sheet opened from More ▸ How to Play
 /// or, with a keyboard, the Help menu. The same content as the README's "How to play".
 struct HowToPlayView: View {
     var done: (() -> Void)?
@@ -26,9 +26,11 @@ struct HowToPlayView: View {
 
 /// The sections themselves, without the scroll view (so they can also be rendered to an image).
 struct HowToPlayContent: View {
+    @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            ForEach(HowToPlay.sections) { section in
+            ForEach(HowToPlay.sections(drawPile: drawPileSide)) { section in
                 VStack(alignment: .leading, spacing: 6) {
                     Text(section.title)
                         .font(.headline)
@@ -52,14 +54,19 @@ enum HowToPlay {
         var id: String { title }
     }
 
-    static var sections: [Section] {
-        [
+    /// With the draw pile on the left (the default).
+    static var sections: [Section] { sections(drawPile: .left) }
+
+    /// Where the stock and foundations are follows the draw pile setting (spec "Top row").
+    static func sections(drawPile: DrawPileSide) -> [Section] {
+        let (stock, foundations) = drawPile == .left ? ("top left", "top right") : ("top right", "top left")
+        return [
             Section(title: "Goal", lines: [
-                "Move all 52 cards onto the four foundations (marked **A**, top right) — one pile per suit, from ace up to king.",
+                "Move all 52 cards onto the four foundations (marked **A**, \(foundations)) — one pile per suit, from ace up to king.",
             ]),
             Section(title: "The deal", lines: [
                 "Seven columns: the first has one card, the seventh has seven. Only the last card of each column is face up.",
-                "The other 24 cards are the **stock** (top left). Cards you draw go face up on the **waste** beside it.",
+                "The other 24 cards are the **stock** (\(stock)). Cards you draw go face up on the **waste** beside it. (Settings can put this draw pile on either side.)",
             ]),
             Section(title: "Moves", lines: [
                 "**To a foundation:** an ace onto an empty foundation, then the same suit one rank higher. Cards go up from the waste or the bottom of a column.",

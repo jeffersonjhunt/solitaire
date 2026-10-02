@@ -17,8 +17,8 @@ Mac app is sandboxed without a network permission, and nothing leaves the device
 right), one pile per suit, from ace up to king.
 
 **The deal:** seven columns; column 1 has one card, column 7 has seven. Only the last card of each
-column is face up. The other 24 cards are the **stock** (top left); cards you draw go face up on
-the **waste** next to it.
+column is face up. The other 24 cards are the **stock** (top left, or top right if you put the draw
+pile on the right in Settings); cards you draw go face up on the **waste** next to it.
 
 **Moves:**
 

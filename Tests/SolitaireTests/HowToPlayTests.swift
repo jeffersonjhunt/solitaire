@@ -28,6 +28,15 @@ import Testing
         #expect(text.contains("↩\u{FE0E}"), "the auto-finish shortcut is still described")
     }
 
+    /// The stock and foundations are described where the draw pile setting puts them.
+    @Test func followsTheDrawPileSide() {
+        let text = { (side: DrawPileSide) in
+            HowToPlay.sections(drawPile: side).flatMap(\.lines).joined(separator: "\n")
+        }
+        #expect(text(.left).contains("**stock** (top left)") && text(.left).contains("**A**, top right"))
+        #expect(text(.right).contains("**stock** (top right)") && text(.right).contains("**A**, top left"))
+    }
+
     /// The resume switch is described where it actually is on this platform.
     @Test func pointsToThisPlatformsResumeSetting() {
         let saving = HowToPlay.sections.first { $0.title == "Saving" }!.lines.joined()
