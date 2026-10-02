@@ -63,7 +63,9 @@ enum SaveValidation {
         guard s.foundations.count == 4, s.tableau.count == 7,
               s.drawCount == 1 || s.drawCount == 3,
               !s.isWon, !SolitaireEngine.isWon(s),
-              s.moveCount >= 0, s.elapsed >= 0, s.elapsed.isFinite else { return false }
+              s.moveCount >= 0, s.elapsed >= 0, s.elapsed.isFinite,
+              (0...s.moveCount).contains(s.redeals)             // each redeal is itself a move
+        else { return false }
         let cards = s.stock + s.waste + s.foundations.flatMap { $0 } + s.tableau.flatMap { $0 }
         guard cards.count == 52, cards.allSatisfy({ (1...13).contains($0.rank) }),
               Set(cards.map(\.id)).count == 52 else { return false }

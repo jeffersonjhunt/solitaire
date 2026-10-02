@@ -50,6 +50,16 @@ func legalMoves(_ s: GameState) -> [Move] {
         #expect(!store.canUndo)
     }
 
+    /// Undo takes a redeal back, pass count included.
+    @Test func undoTakesARedealBack() {
+        let store = makeStore()
+        while !store.state.stock.isEmpty { store.tapStock() }
+        store.tapStock()                                            // redeal
+        #expect(store.state.redeals == 1)
+        store.undo()
+        #expect(store.state.redeals == 0 && store.state.passes == 1 && store.state.stock.isEmpty)
+    }
+
     @Test func undoStackIsCappedAtThreeHundred() {
         let store = makeStore()
         for _ in 0..<350 { store.tapStock() }

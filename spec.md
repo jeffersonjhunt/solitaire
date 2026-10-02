@@ -34,7 +34,7 @@ Legal moves the engine must allow, and nothing else:
 - Foundation top card back to a tableau column, under the same colour-and-rank rule.
 - Turning a card face up: when a move leaves a column's last card face down, it flips face up automatically. This is part of the same move for undo purposes.
 
-Draw modes: draw 1 or draw 3, fixed for the life of a deal; switching mode deals a new game (see "New games and the draw mode"). Draw 3 turns up to three cards to the waste and only the topmost is playable. Redeals are unlimited: with the stock empty, tapping it returns the waste to the stock in reverse order, face down, and counts as one move.
+Draw modes: draw 1 or draw 3, fixed for the life of a deal; switching mode deals a new game (see "New games and the draw mode"). Draw 3 turns up to three cards to the waste and only the topmost is playable. Redeals are unlimited: with the stock empty, tapping it returns the waste to the stock in reverse order, face down, and counts as one move. The game counts its **passes** through the deck: the first trip through the stock is pass 1, and each redeal starts another (`redeals` in the state; passes = redeals + 1). Undo takes a redeal back with the rest of the move. A game saved before passes were counted resumes with none.
 
 The game is won when all four foundations hold 13 cards. There is no scoring and no loss state — a stuck game is simply a game the player restarts or undoes out of.
 
@@ -83,6 +83,7 @@ struct GameState: Codable, Sendable {
     var elapsed: TimeInterval
     var isWon: Bool
     var seed: UInt64           // the shuffle seed, for replay and tests
+    var redeals: Int           // times the waste was turned back over (passes = redeals + 1)
 }
 ```
 
@@ -175,8 +176,8 @@ Decided from the 1.1 mockups (design canvas, "1.1 — every dialog and screen").
   system alert and sheet on every platform. Return chooses the main button and Esc cancels;
   VoiceOver treats the card as modal and starts at its title. Tapping the dimmed table outside a
   question cancels it; outside the win card it does nothing.
-- **Win card:** the draw mode as a small label, "You won!", the figures in Space Mono (MOVES and
-  TIME; PASSES, UNDOS and the score join with 1.1's later units), then **New Game · Draw n** in
+- **Win card:** the draw mode as a small label, "You won!", the figures in Space Mono (MOVES, TIME
+  and PASSES; UNDOS and the score join with 1.1's later units), then **New Game · Draw n** in
   the same mode (orange), **Draw m instead**, and **Close**. On iPhone it sits at the bottom of
   the screen; on iPad, the Mac and a phone held sideways it is centred, at most 480 pt wide, with
   its buttons in one row — Close and the other mode at their labels' width, the main button taking

@@ -79,6 +79,7 @@ public enum SolitaireEngine {
                 return c
             }
             state.waste = []
+            state.redeals += 1
         } else {
             for _ in 0..<min(state.drawCount, state.stock.count) {
                 var card = state.stock.removeLast()

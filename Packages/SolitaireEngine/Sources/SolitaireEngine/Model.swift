@@ -53,10 +53,15 @@ public struct GameState: Codable, Sendable, Equatable {
     public var elapsed: TimeInterval
     public var isWon: Bool
     public var seed: UInt64           // the shuffle seed, for replay and tests
+    /// Times the waste has been turned back over into the stock.
+    public var redeals: Int
+
+    /// Trips through the deck: the first is pass 1, and each redeal starts another.
+    public var passes: Int { redeals + 1 }
 
     public init(stock: [Card], waste: [Card], foundations: [[Card]], tableau: [[Card]],
                 drawCount: Int, moveCount: Int = 0, elapsed: TimeInterval = 0,
-                isWon: Bool = false, seed: UInt64 = 0) {
+                isWon: Bool = false, seed: UInt64 = 0, redeals: Int = 0) {
         self.stock = stock
         self.waste = waste
         self.foundations = foundations
@@ -66,6 +71,23 @@ public struct GameState: Codable, Sendable, Equatable {
         self.elapsed = elapsed
         self.isWon = isWon
         self.seed = seed
+        self.redeals = redeals
+    }
+
+    /// Decodes a saved game. Saves from before passes were counted have no `redeals` and resume
+    /// with none.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stock = try c.decode([Card].self, forKey: .stock)
+        waste = try c.decode([Card].self, forKey: .waste)
+        foundations = try c.decode([[Card]].self, forKey: .foundations)
+        tableau = try c.decode([[Card]].self, forKey: .tableau)
+        drawCount = try c.decode(Int.self, forKey: .drawCount)
+        moveCount = try c.decode(Int.self, forKey: .moveCount)
+        elapsed = try c.decode(TimeInterval.self, forKey: .elapsed)
+        isWon = try c.decode(Bool.self, forKey: .isWon)
+        seed = try c.decode(UInt64.self, forKey: .seed)
+        redeals = try c.decodeIfPresent(Int.self, forKey: .redeals) ?? 0
     }
 
     /// The cards of any pile, bottom to top.
