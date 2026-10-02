@@ -240,6 +240,21 @@ final class SolitaireUITests: XCTestCase {
         #endif
     }
 
+    #if os(macOS)
+    /// Closing the game window quits the app — even with another of its windows open — so ⌘N can
+    /// never act on a game that isn't on screen.
+    func testClosingTheGameWindowQuits() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "About Solitaire")
+        XCTAssertTrue(app.windows["About Solitaire"].waitForExistence(timeout: 5))
+        let game = app.windows.matching(NSPredicate(format: "title == 'Solitaire'")).firstMatch
+        XCTAssertTrue(game.exists, "the game window")
+        game.buttons[XCUIIdentifierCloseWindow].click()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10), "closing the game window quits")
+    }
+    #endif
+
     /// The question before losing a game: an alert on iPhone and iPad, a sheet on the Mac. Nil if
     /// none appears within `timeout`.
     @discardableResult

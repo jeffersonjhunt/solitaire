@@ -234,7 +234,8 @@ question, because nothing would be lost.
 - **The win sheet** keeps New Game: Draw 1 / Draw 3 — the game is over, so nothing is asked.
 
 The mode of the last deal is remembered and used for the next New Game and the next launch's
-fresh deal. Cancel leaves the game, its mode and its timer untouched.
+fresh deal. Cancel leaves the game, its mode and its timer untouched. Asking stops auto-finish
+where it is, so a game cannot be won behind the question; Finish is offered again after Cancel.
 
 **About** — a sheet on iPhone and iPad, its own window on the Mac (replacing the standard About
 panel):
@@ -260,7 +261,7 @@ On launch the app decodes that file, checks it holds 52 distinct cards and is no
 
 Settings live in `UserDefaults` via `@AppStorage`: the draw count of the last deal (default 1), a preference for whether to resume or always deal fresh (default resume), the card face (default Classic) and the card back (default Classic Blue). An unknown or invalid stored value falls back to the default. New games deal in the remembered draw count; the draw chip changes it (see "New games and the draw mode").
 
-On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size.
+On macOS, window size and position restore through the standard scene restoration; the game itself is not tied to a particular window size. The game window is the app: closing it quits Solitaire (saving as any quit does), and any How to Play, About or Settings window closes with it — so a menu command can never act on a game that is not on screen.
 
 ## Acceptance criteria and open decisions
 
@@ -299,3 +300,4 @@ Recorded as they are made; each overrides anything above it conflicts with.
 | 2026-10-01 | Card styles, Settings and About (plan agreed from the "Cards" and "Settings and About" mockups): faces Classic, Big Index, Vintage and Night; backs Classic Blue, Burnt Orange, Racing Green and Art Deco (Art Deco replaced Night Pinstripe after a look on TestFlight); chosen independently, Classic + Classic Blue by default, applied live. Four Colour was left out: blue diamonds and green clubs blur Klondike's red/black alternation. More offers How to Play, Settings… and About Solitaire; Draw Three and Resume move into Settings, and the new-game chooser keeps only Draw 1 / Draw 3. About links open in the browser; the app still has no network code. Copyright line: "© 2026 One Off Endeavors". |
 | 2026-10-01 | Corner index margin (after a look at TestFlight build 202610012043): the index sat almost on the card's top edge. It now has a 0.07 × card width margin above it, as at its left, at full size; to keep D1's promise that it reads in the tightest fan, the minimum face-up fan rises from 0.2 to 0.24 × card height. Portrait boards are unchanged; on a phone held sideways or a short Mac window cards come out about 8 % smaller. |
 | 2026-10-01 | Draw chip and direct New Game (after U12 on TestFlight): the header's draw mode becomes a button that switches mode by dealing a new game, and New Game deals at once in the current mode — no chooser. Both ask before replacing a game in progress (a move made, not won), never otherwise. Settings drops the draw picker and the chip drops "· NEXT n": one place to change the mode, always showing the game being played. |
+| 2026-10-01 | Closing the Mac's game window quits the app (U13 review): with the window gone, ⌘N's question had nowhere to appear and surfaced later. |

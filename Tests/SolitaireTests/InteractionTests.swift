@@ -58,7 +58,7 @@ import SolitaireEngine
         let ui = AppUI()
         #expect(!store.isInProgress, "no move made yet")
         ui.requestNewGame(drawCount: 3, store: store)               // the chip
-        #expect(ui.pendingNewGame == nil && store.state.drawCount == 3 && store.preferredDrawCount == 3)
+        #expect(ui.pendingNewGame == nil && store.state.drawCount == 3 && store.lastDrawCount == 3)
         let seed = store.state.seed
         ui.requestNewGame(store: store)                             // New Game
         #expect(ui.pendingNewGame == nil && store.state.seed != seed && store.state.drawCount == 3,
@@ -73,7 +73,7 @@ import SolitaireEngine
         let before = store.state
         ui.requestNewGame(drawCount: 3, store: store)
         #expect(ui.pendingNewGame == NewGameRequest(drawCount: 3, switching: true))
-        #expect(store.state == before && store.preferredDrawCount == 1, "nothing dealt or remembered yet")
+        #expect(store.state == before && store.lastDrawCount == 1, "nothing dealt or remembered yet")
         #expect(ui.pendingNewGame?.title == "Switch to Draw 3?")
         #expect(ui.pendingNewGame?.confirm == "Start New Game")
         ui.requestNewGame(store: store)
@@ -100,9 +100,27 @@ import SolitaireEngine
         var saved = makeStore(drawCount: 3).state
         saved.moveCount = 5
         store.resume(from: saved)
-        #expect(store.preferredDrawCount == 3)
+        #expect(store.lastDrawCount == 3)
         store.newGame()
         #expect(store.state.drawCount == 3)
+    }
+
+    /// Asking stops auto-finish: no card flies home behind the question, and the game cannot be
+    /// won there. Finish is still offered afterwards.
+    @Test func askingStopsAutoFinish() async {
+        let store = makeStore()
+        var s = UITestScenario.state(named: "almostWon")!
+        s.moveCount = 40
+        store.resume(from: s)
+        store.autoFinish()
+        #expect(store.isAutoFinishing)
+        let ui = AppUI()
+        ui.requestNewGame(store: store)
+        #expect(ui.pendingNewGame != nil && !store.isAutoFinishing)
+        let home = store.state.foundations.map(\.count)
+        try? await Task.sleep(for: GameStore.autoFinishStep * 4)
+        #expect(store.state.foundations.map(\.count) == home && !store.state.isWon, "nothing more went home")
+        #expect(store.canAutoFinish, "Finish is offered again")
     }
 
     @Test func anInvalidCountBecomesDrawOne() {

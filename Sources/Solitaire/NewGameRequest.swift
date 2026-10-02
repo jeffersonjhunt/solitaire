@@ -18,6 +18,7 @@ struct NewGameRequest: Equatable {
 extension AppUI {
     /// Deals a new game — in `drawCount`, or the current game's mode — at once, unless that would
     /// lose a game in progress; then it only asks (`pendingNewGame`), and the alert deals or not.
+    /// Asking stops auto-finish, so the game cannot be won behind the question.
     func requestNewGame(drawCount: Int? = nil, store: GameStore) {
         let count = GameStore.validDrawCount(drawCount ?? store.state.drawCount)
         guard store.isInProgress else {
@@ -25,6 +26,7 @@ extension AppUI {
             store.newGame(drawCount: count)
             return
         }
+        store.stopAutoFinish()
         pendingNewGame = NewGameRequest(drawCount: count, switching: count != store.state.drawCount)
     }
 }

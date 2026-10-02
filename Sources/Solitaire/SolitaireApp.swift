@@ -103,7 +103,7 @@ struct SolitaireApp: App {
     }
 }
 
-/// Settings live in UserDefaults (spec): the draw count for the next deal (default 1) and whether
+/// Settings live in UserDefaults (spec): the draw count of the last deal (default 1) and whether
 /// to resume the game in progress at launch (default yes). Debug builds let UI tests use their own
 /// suite, so a test choosing Draw 3 never changes the player's real preference.
 enum AppSettings {

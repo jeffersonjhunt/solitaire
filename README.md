@@ -63,7 +63,8 @@ game would be lost; on a fresh deal or after a win it just deals.
 
 The game in progress is saved after every move and every few seconds, and when you quit or switch
 away; it resumes at the next launch (undo history starts fresh). Quitting normally keeps the time
-exactly; a force quit returns to the last save, at most five seconds earlier.
+exactly; a force quit returns to the last save, at most five seconds earlier. On the Mac, closing the
+game window quits Solitaire (and saves).
 
 The draw mode of your last deal is remembered (default: one card). Settings: whether to resume the game in
 progress at launch (default: yes), and the card face (Classic, Big Index, Vintage, Night; default

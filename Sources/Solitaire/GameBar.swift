@@ -88,6 +88,7 @@ struct GameHeader: View {
         .padding(.vertical, -8)
         .accessibilityLabel(chip.spoken)
         .accessibilityHint(chip.hint)
+        .accessibilityInputLabels([chip.text.capitalized, chip.spoken, "Draw mode"])   // Voice Control: "Draw 1" works
         .accessibilityIdentifier("drawChip")
     }
 
