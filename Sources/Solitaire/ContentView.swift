@@ -91,7 +91,7 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
             } else if winSheetShown.wrappedValue {
-                DialogScrim(bottom: !wideDialogs) {
+                DialogScrim(bottom: !wideDialogs, maxWidth: 480) {
                     WinCard(drawCount: store.state.drawCount, moves: store.state.moveCount,
                             elapsed: store.state.elapsed, wide: wideDialogs,
                             newGame: { store.newGame(drawCount: $0) },

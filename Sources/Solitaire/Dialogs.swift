@@ -21,6 +21,8 @@ struct DialogButtonStyle: ButtonStyle {
     enum Kind { case main, outlined, plain }
     var kind: Kind
     var height: CGFloat = 48
+    /// Takes all the width it is offered; false: just its label's width (plus padding).
+    var fills = true
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -29,8 +31,8 @@ struct DialogButtonStyle: ButtonStyle {
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .foregroundStyle(kind == .main ? TableColors.onAccent : kind == .plain ? DialogColors.body : DialogColors.title)
-            .frame(maxWidth: .infinity, minHeight: height)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, fills ? 8 : 16)
+            .frame(maxWidth: fills ? .infinity : nil, minHeight: height)
             .background {
                 switch kind {
                 case .main: shape.fill(TableColors.accent)
@@ -189,10 +191,11 @@ struct WinCard: View {
         let same = Button("New Game · Draw \(drawCount)") { newGame(drawCount) }
             .buttonStyle(DialogButtonStyle(kind: .main, height: wide ? 44 : 54))
             .keyboardShortcut(.defaultAction)
+        // In one row the main button gets whatever its neighbours leave, so its label is never cut.
         let switchMode = Button("Draw \(other) instead") { newGame(other) }
-            .buttonStyle(DialogButtonStyle(kind: .outlined, height: wide ? 44 : 48))
+            .buttonStyle(DialogButtonStyle(kind: .outlined, height: wide ? 44 : 48, fills: !wide))
         let closeButton = Button("Close", action: close)
-            .buttonStyle(DialogButtonStyle(kind: wide ? .outlined : .plain, height: 44))
+            .buttonStyle(DialogButtonStyle(kind: wide ? .outlined : .plain, height: 44, fills: !wide))
             .keyboardShortcut(.cancelAction)
         Group {
             if wide {

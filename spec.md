@@ -178,7 +178,9 @@ Decided from the 1.1 mockups (design canvas, "1.1 — every dialog and screen").
 - **Win card:** the draw mode as a small label, "You won!", the figures in Space Mono (MOVES and
   TIME; PASSES, UNDOS and the score join with 1.1's later units), then **New Game · Draw n** in
   the same mode (orange), **Draw m instead**, and **Close**. On iPhone it sits at the bottom of
-  the screen; on iPad and the Mac it is centred, at most 420 pt wide.
+  the screen; on iPad, the Mac and a phone held sideways it is centred, at most 480 pt wide, with
+  its buttons in one row — Close and the other mode at their labels' width, the main button taking
+  the rest so its label is never cut.
 - **Question cards:** a small label (NEW GAME, or DRAW 1 → DRAW 3), the title, the message, then
   **Cancel** (outlined) and the confirming button (orange), centred.
 - **Settings, About and How to Play** stay system sheets and forms, with the orange accent.
