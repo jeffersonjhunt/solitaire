@@ -65,6 +65,7 @@ enum SaveValidation {
               !s.isWon, !SolitaireEngine.isWon(s),
               s.moveCount >= 0, s.elapsed >= 0, s.elapsed.isFinite,
               (0...s.moveCount).contains(s.redeals),            // each redeal is itself a move
+              s.undos >= 0,
               s.passes <= s.maxPasses ?? .max                   // Hard Core: within its limit
         else { return false }
         let cards = s.stock + s.waste + s.foundations.flatMap { $0 } + s.tableau.flatMap { $0 }

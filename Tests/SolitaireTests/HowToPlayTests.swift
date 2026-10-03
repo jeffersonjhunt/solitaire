@@ -10,7 +10,7 @@ import Testing
     /// stock and both draw modes, winning and auto-finish, and saving.
     @Test func coversTheRules() {
         let titles = HowToPlay.sections.map(\.title)
-        #expect(titles == ["Goal", "The deal", "Moves", "Hard Core", "The stock", "Controls", "Winning", "Saving"])
+        #expect(titles == ["Goal", "The deal", "Moves", "Scoring", "Hard Core", "The stock", "Controls", "Winning", "Saving"])
         for phrase in ["ace up to king", "opposite colour", "Empty column:** only a king",
                        "Back from a foundation", "turns over by itself", "Draw 3", "turn the waste back over",
                        "Auto-finish", "no losing", "resumes at the next launch"] {
@@ -35,6 +35,14 @@ import Testing
         }
         #expect(text(.left).contains("**stock** (top left)") && text(.left).contains("**A**, top right"))
         #expect(text(.right).contains("**stock** (top right)") && text(.right).contains("**A**, top left"))
+    }
+
+    /// Scoring is explained with the spec's numbers.
+    @Test func explainsScoring() {
+        let text = HowToPlay.sections.first { $0.title == "Scoring" }?.lines.joined() ?? ""
+        for figure in ["**600**", "**+5**", "**+35**", "**−3**", "**−100**", "**1000**"] {
+            #expect(text.contains(figure), "\(figure)")
+        }
     }
 
     /// Hard Core is explained: its passes, the ✕, where to turn it on.

@@ -84,6 +84,8 @@ final class GameStore {
     /// Nothing undoes a win: a won game cannot be un-won (spec decision).
     var canUndo: Bool { !undoStack.isEmpty && !state.isWon }
     var canAutoFinish: Bool { SolitaireEngine.canAutoFinish(state) }
+    /// The live score (spec "Scoring").
+    var score: Int { SolitaireEngine.score(state) }
     /// A game the player would lose by dealing again: a move (a draw included) made, and not won.
     /// Only such a game is asked about before a new deal replaces it.
     var isInProgress: Bool { state.moveCount > 0 && !state.isWon }
@@ -161,9 +163,13 @@ final class GameStore {
         updateClock()
     }
 
+    /// Takes back the last change: board, moves and passes as they were — but the clock keeps its
+    /// time and the undo is counted (spec "Scoring"), so undoing never earns back time or points.
     func undo() {
-        guard canUndo, let previous = undoStack.popLast() else { return }
+        guard canUndo, var previous = undoStack.popLast() else { return }
         stopAutoFinish()
+        previous.elapsed = state.elapsed
+        previous.undos = state.undos + 1
         state = previous
         updateClock()
     }

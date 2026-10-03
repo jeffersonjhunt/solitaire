@@ -173,6 +173,29 @@ public enum SolitaireEngine {
         return best?.move
     }
 
+    // MARK: Scoring (spec "Scoring")
+
+    public static let startingScore = 600
+
+    /// The score, worked out from the game itself: 600, +5 per card on a foundation, +35 per
+    /// complete suit, −3 per undo, −100 per redeal, less the time penalty; never below 0.
+    public static func score(_ state: GameState) -> Int {
+        let onFoundations = state.foundations.reduce(0) { $0 + $1.count }
+        let suits = state.foundations.filter { $0.count == 13 }.count
+        let raw = startingScore + 5 * onFoundations + 35 * suits
+            - 3 * state.undos - 100 * state.redeals - timePenalty(seconds: Int(state.elapsed))
+        return max(raw, 0)
+    }
+
+    /// Free for the first minute; then 1 point a second in the second minute, 2 in the third, and so
+    /// on: 60 by 2:00, 180 by 3:00, 600 by 5:00.
+    public static func timePenalty(seconds: Int) -> Int {
+        guard seconds > 60 else { return 0 }
+        let past = seconds - 60
+        let minutes = past / 60, rest = past % 60
+        return 60 * minutes * (minutes + 1) / 2 + rest * (minutes + 1)
+    }
+
     public static func isWon(_ state: GameState) -> Bool {
         state.foundations.count == 4 && state.foundations.allSatisfy { $0.count == 13 }
     }

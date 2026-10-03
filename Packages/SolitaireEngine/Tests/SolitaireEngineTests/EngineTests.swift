@@ -439,3 +439,56 @@ enum GoldenDeal {
         #expect(try JSONDecoder().decode(GameState.self, from: data) == s)
     }
 }
+
+// MARK: - Scoring (spec "Scoring")
+
+@Suite struct Scoring {
+    @Test func aFreshDealIsWorth600() {
+        #expect(E.score(E.newGame(drawCount: 1, seed: 3)) == 600)
+    }
+
+    @Test(arguments: [(0, 0), (60, 0), (61, 1), (120, 60), (121, 62), (180, 180), (240, 360), (300, 600), (390, 1080)])
+    func theTimePenaltyEscalatesEachMinute(seconds: Int, penalty: Int) {
+        #expect(E.timePenalty(seconds: seconds) == penalty)
+    }
+
+    /// The spec's table: a one-pass, no-undo win scores 1000 under a minute, then less with time.
+    @Test(arguments: [(59, 1000), (120, 940), (180, 820), (240, 640), (300, 400), (390, 0)])
+    func aOnePassWin(seconds: Int, score: Int) {
+        var s = E.newGame(drawCount: 1, seed: 3)
+        s.foundations = Suit.allCases.map { suit in (1...13).map { Card(suit: suit, rank: $0, isFaceUp: true) } }
+        s.tableau = Array(repeating: [], count: 7); s.stock = []; s.waste = []
+        s.elapsed = TimeInterval(seconds)
+        #expect(E.score(s) == score)
+    }
+
+    @Test func cardsSuitsUndosAndRedealsCount() {
+        var s = E.newGame(drawCount: 1, seed: 3)
+        s.foundations[0] = (1...13).map { Card(suit: .spades, rank: $0, isFaceUp: true) }   // a suit
+        s.foundations[1] = [Card(suit: .hearts, rank: 1, isFaceUp: true)]                     // one more card
+        #expect(E.score(s) == 600 + 5 * 14 + 35)
+        s.undos = 2
+        #expect(E.score(s) == 600 + 70 + 35 - 6)
+        s.redeals = 1
+        #expect(E.score(s) == 600 + 70 + 35 - 6 - 100)
+        s.foundations[0].removeLast()                                                          // the king back off
+        #expect(E.score(s) == 600 + 65 - 6 - 100, "the card's 5 and the suit's 35 go")
+    }
+
+    @Test func neverBelowZero() {
+        var s = E.newGame(drawCount: 3, seed: 3)
+        s.redeals = 9
+        #expect(E.score(s) == 0)
+    }
+
+    @Test func olderSavesHaveNoUndos() throws {
+        var s = E.newGame(drawCount: 1, seed: 7)
+        s.undos = 5
+        let data = try JSONEncoder().encode(s)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "undos")
+        let old = try JSONDecoder().decode(GameState.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(old.undos == 0)
+        #expect(try JSONDecoder().decode(GameState.self, from: data) == s)
+    }
+}

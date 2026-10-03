@@ -58,6 +58,8 @@ public struct GameState: Codable, Sendable, Equatable {
 
     /// Hard Core: passes through the deck are limited (`maxPasses`).
     public var isHardCore: Bool
+    /// Undos taken in this game (scoring). Undo itself never takes this back.
+    public var undos: Int
 
     /// Trips through the deck: the first is pass 1, and each redeal starts another.
     public var passes: Int { redeals + 1 }
@@ -67,7 +69,8 @@ public struct GameState: Codable, Sendable, Equatable {
 
     public init(stock: [Card], waste: [Card], foundations: [[Card]], tableau: [[Card]],
                 drawCount: Int, moveCount: Int = 0, elapsed: TimeInterval = 0,
-                isWon: Bool = false, seed: UInt64 = 0, redeals: Int = 0, isHardCore: Bool = false) {
+                isWon: Bool = false, seed: UInt64 = 0, redeals: Int = 0, isHardCore: Bool = false,
+                undos: Int = 0) {
         self.stock = stock
         self.waste = waste
         self.foundations = foundations
@@ -79,10 +82,11 @@ public struct GameState: Codable, Sendable, Equatable {
         self.seed = seed
         self.redeals = redeals
         self.isHardCore = isHardCore
+        self.undos = undos
     }
 
     /// Decodes a saved game. Saves from before passes were counted have no `redeals` and resume
-    /// with none; saves from before Hard Core are normal games.
+    /// with none; saves from before Hard Core are normal games, and from before scoring have no undos.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         stock = try c.decode([Card].self, forKey: .stock)
@@ -96,6 +100,7 @@ public struct GameState: Codable, Sendable, Equatable {
         seed = try c.decode(UInt64.self, forKey: .seed)
         redeals = try c.decodeIfPresent(Int.self, forKey: .redeals) ?? 0
         isHardCore = try c.decodeIfPresent(Bool.self, forKey: .isHardCore) ?? false
+        undos = try c.decodeIfPresent(Int.self, forKey: .undos) ?? 0
     }
 
     /// The cards of any pile, bottom to top.

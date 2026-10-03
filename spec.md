@@ -85,6 +85,7 @@ struct GameState: Codable, Sendable {
     var seed: UInt64           // the shuffle seed, for replay and tests
     var redeals: Int           // times the waste was turned back over (passes = redeals + 1)
     var isHardCore: Bool       // Hard Core: passes limited (see "Hard Core")
+    var undos: Int             // undos taken in this game (scoring); survives undo itself
 }
 ```
 
@@ -114,7 +115,7 @@ Tap-to-move picks a destination in this order: the matching foundation if a sing
 
 Auto-finish is offered when the stock and waste are empty and every tableau card is face up. It plays the lowest available rank to a foundation every 90 ms until no move remains, and each step is a normal move, so undo walks back through them.
 
-Undo is a stack of `GameState` snapshots pushed before every state change, capped at 300 entries and cleared on a new deal. Draw, redeal, move and flip are all undoable; a flip is never undone separately from the move that caused it. Redo is not required.
+Undo is a stack of `GameState` snapshots pushed before every state change, capped at 300 entries and cleared on a new deal. Draw, redeal, move and flip are all undoable; a flip is never undone separately from the move that caused it. Redo is not required. Undo restores the board, the move count and the passes, but not the clock or the undo count: time keeps running and each undo is counted (both cost points — see "Scoring"), so undoing can never earn back time.
 
 `GameStore` is an `@Observable final class` on the main actor. It owns the current `GameState`, the undo stack, a one-second timer that ticks only while the game is started, unwon and the app is active, and the pending drag. Views call intents on it — `tap(pile:index:)`, `drop(source:index:on:)`, `tapStock()`, `undo()`, `newGame(drawCount:)`, `autoFinish()` — and never mutate state themselves.
 
@@ -155,7 +156,7 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Face-up fan | Card height × 0.29, scaled down together with the face-down fan when a column would overflow the board |
 | Minimum hit target | 44 pt on touch; cards below that width force a compressed layout |
 
-The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with moves, elapsed time and the draw chip (the current game's draw mode, a button) in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
+The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with the score, elapsed time, moves and the draw chip (the current game's draw mode, a button) in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
 
 Cards are drawn in SwiftUI, not images, in the face and back the player has chosen (see "Card styles"): a rounded rectangle with a hairline border and a 1 pt shadow, corner index top-left, a large suit below it.
 
@@ -177,8 +178,8 @@ Decided from the 1.1 mockups (design canvas, "1.1 — every dialog and screen").
   system alert and sheet on every platform. Return chooses the main button and Esc cancels;
   VoiceOver treats the card as modal and starts at its title. Tapping the dimmed table outside a
   question cancels it; outside the win card it does nothing.
-- **Win card:** the draw mode as a small label, "You won!", the figures in Space Mono (MOVES, TIME
-  and PASSES; UNDOS and the score join with 1.1's later units), then **New Game · Draw n** in
+- **Win card:** the draw mode as a small label, "You won!", SCORE large in Space Mono, then the
+  figures MOVES, TIME, PASSES and UNDOS, then **New Game · Draw n** in
   the same mode (orange), **Draw m instead**, and **Close**. On iPhone it sits at the bottom of
   the screen; on iPad, the Mac and a phone held sideways it is centred, at most 480 pt wide, with
   its buttons in one row — Close and the other mode at their labels' width, the main button taking
@@ -226,6 +227,26 @@ Rules every style keeps:
 - **No inversion in dark mode:** faces and backs look the same in light and dark appearance; Night
   is a choice, not an automatic mode.
 - **Live:** changing a face or back restyles every card at once, including the game in progress.
+
+## Scoring
+
+Every game starts at **600**. The score is worked out from the game itself — never kept as a
+running total — so it cannot drift from the board:
+
+| What | Points |
+|---|---|
+| Each card on a foundation | +5 (so a card taken back off costs 5) |
+| Each complete suit (13 on a foundation) | +35 (a whole suit is worth 100) |
+| Each undo | −3 (and the undone move's points go with it) |
+| Each redeal (pass after the first) | −100 |
+| Time, from 1:00 | −1 a second from 1:00 to 2:00, −2 from 2:00 to 3:00, and so on |
+| Floor | 0 |
+
+A one-pass win in under a minute scores 1000; a one-pass win with no undos scores 940 at 2:00,
+820 at 3:00, 640 at 4:00, 400 at 5:00 and 0 from about 6:30. Auto-finish moves score like any
+others. The score is live: **SCORE** leads the header (SCORE, TIME, MOVES and the draw chip, on
+every size) and ticks down with the clock; VoiceOver reads "Score 754". The win card shows it
+large over MOVES, TIME, PASSES and UNDOS. A game saved before undos were counted resumes with none.
 
 ## Hard Core
 
@@ -328,7 +349,7 @@ Build the engine and its tests before any view. The app is done when all of thes
 - [ ] A new deal always produces 52 distinct cards, 28 in the tableau with exactly 7 face up, and 24 in the stock.
 - [ ] Every legal move listed in the rules succeeds and every illegal one is refused, covered by unit tests on `canMove`.
 - [ ] Draw 3 leaves only the waste's top card playable; redeal restores the stock in reverse order.
-- [ ] Undo from any point returns the exact previous state, including face-up flips and redeals, for 100 random moves from a fixed seed.
+- [ ] Undo from any point returns the exact previous board, move count and passes, including face-up flips and redeals, for 100 random moves from a fixed seed — with the undo count rising by one each time.
 - [ ] A game played to a win from a known-solvable seed sets `isWon` and shows the win card with the move count and time.
 - [ ] Tap-to-move never produces a no-op, and dragging a king onto an empty column from the bottom of another column is possible by drag but not offered by tap.
 - [ ] Force-quitting mid-game and relaunching restores the same board, move count and elapsed time.
