@@ -151,6 +151,7 @@ struct QuestionCard: View {
 /// phone held sideways); otherwise stacked for a phone held upright.
 struct WinCard: View {
     let drawCount: Int
+    var hardCore = false
     let moves: Int
     let elapsed: TimeInterval
     let passes: Int
@@ -164,7 +165,7 @@ struct WinCard: View {
     var body: some View {
         DialogCard(cornerRadius: wide ? 24 : 28, identifier: "winCard") {
             VStack(spacing: 6) {
-                DialogKicker(text: "DRAW \(drawCount)")
+                DialogKicker(text: hardCore ? "DRAW \(drawCount) · HARD CORE" : "DRAW \(drawCount)")
                 Text("You won!")
                     .font(.largeTitle.bold())
                     .foregroundStyle(DialogColors.title)

@@ -75,6 +75,9 @@ enum HowToPlay {
                 "**Back from a foundation:** drag its top card onto a column, under the same colour and rank rule.",
                 "A face-down card uncovered at the bottom of a column turns over by itself.",
             ]),
+            Section(title: "Hard Core", lines: [
+                "A harder game: **one pass** through the deck in Draw 1, **three** in Draw 3. When they're used up the stock shows ✕. Turn it on in **Settings** — changing it starts a new game.",
+            ]),
             Section(title: "The stock", lines: [
                 "Draw one card, or three in **Draw 3** mode — then only the top card of the waste can be played.",
                 "When the stock is empty, draw again to turn the waste back over. There is no limit.",

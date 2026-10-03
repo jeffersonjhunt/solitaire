@@ -384,3 +384,58 @@ enum GoldenDeal {
         #expect(try JSONDecoder().decode(GameState.self, from: data) == s, "a round trip keeps the count")
     }
 }
+
+// MARK: - Hard Core (spec "Hard Core")
+
+@Suite struct HardCore {
+    /// Plays through the stock once (every card drawn), leaving it empty and the waste full.
+    func exhaustStock(_ s: inout GameState) {
+        while !s.stock.isEmpty { E.drawFromStock(&s) }
+    }
+
+    @Test func draw1GetsOnePassNoRedeal() {
+        var s = E.newGame(drawCount: 1, seed: 11, hardCore: true)
+        #expect(s.isHardCore && s.maxPasses == 1)
+        exhaustStock(&s)
+        #expect(!E.canRedeal(s) && E.isOutOfPasses(s))
+        let before = s
+        E.drawFromStock(&s)
+        #expect(s == before, "no redeal, not even a move counted")
+    }
+
+    @Test func draw3GetsThreePasses() {
+        var s = E.newGame(drawCount: 3, seed: 11, hardCore: true)
+        #expect(s.maxPasses == 3)
+        for pass in 1...3 {
+            #expect(s.passes == pass)
+            exhaustStock(&s)
+            if pass < 3 {
+                #expect(E.canRedeal(s) && !E.isOutOfPasses(s), "pass \(pass): a redeal remains")
+                E.drawFromStock(&s)
+            }
+        }
+        #expect(E.isOutOfPasses(s) && s.redeals == 2)
+        let before = s
+        E.drawFromStock(&s)
+        #expect(s == before, "no third redeal")
+    }
+
+    @Test(arguments: [1, 3])
+    func normalGamesRedealWithoutLimit(drawCount: Int) {
+        var s = E.newGame(drawCount: drawCount, seed: 11)
+        #expect(!s.isHardCore && s.maxPasses == nil)
+        for _ in 0..<5 { exhaustStock(&s); #expect(E.canRedeal(s)); E.drawFromStock(&s) }
+        #expect(s.redeals == 5 && !E.isOutOfPasses(s))
+    }
+
+    /// A save from before Hard Core is a normal game; Hard Core survives a round trip.
+    @Test func olderSavesAreNormalGames() throws {
+        let s = E.newGame(drawCount: 3, seed: 7, hardCore: true)
+        let data = try JSONEncoder().encode(s)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "isHardCore")
+        let old = try JSONDecoder().decode(GameState.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(!old.isHardCore)
+        #expect(try JSONDecoder().decode(GameState.self, from: data) == s)
+    }
+}

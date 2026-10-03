@@ -146,6 +146,56 @@ import SolitaireEngine
         #expect(!AppSettings.askBeforeEndingGame(in: d), "turned off")
     }
 
+    // MARK: Hard Core (spec "Hard Core")
+
+    @Test func theHardCoreSwitchDealsAtOnceOnAFreshGame() {
+        let store = makeStore(drawCount: 3)
+        let ui = AppUI()
+        ui.requestNewGame(hardCore: true, store: store)
+        #expect(ui.pendingNewGame == nil && store.state.isHardCore && store.state.drawCount == 3)
+        #expect(store.lastHardCore, "remembered for the next deal")
+        store.newGame()
+        #expect(store.state.isHardCore, "New Game keeps Hard Core")
+        ui.requestNewGame(drawCount: 1, store: store)
+        #expect(store.state.isHardCore && store.state.drawCount == 1, "so does the draw chip")
+    }
+
+    @Test func theHardCoreSwitchAsksMidGameAndCancelKeepsTheGame() {
+        let store = makeStore(drawCount: 1)
+        let ui = AppUI()
+        store.tapStock()
+        let before = store.state
+        ui.requestNewGame(hardCore: true, store: store)
+        let ask = try! #require(ui.pendingNewGame)
+        #expect(ask.kicker == "HARD CORE" && ask.title == "Turn on Hard Core?" && ask.confirm == "Start Hard Core")
+        #expect(ask.message.hasPrefix("Draw 1 gets one pass through the deck, Draw 3 gets three."))
+        #expect(ask.hardCore && ask.changesHardCore && !ask.switching)
+        #expect(store.state == before && !store.lastHardCore, "nothing dealt or remembered yet")
+        ui.pendingNewGame = nil                                    // Cancel
+        #expect(!store.state.isHardCore)
+    }
+
+    @Test func turningHardCoreOffAsksToo() {
+        let store = makeStore(drawCount: 1)
+        let ui = AppUI()
+        store.newGame(drawCount: 1, hardCore: true)
+        store.tapStock()
+        ui.requestNewGame(hardCore: false, store: store)
+        #expect(ui.pendingNewGame?.title == "Turn off Hard Core?")
+        #expect(ui.pendingNewGame?.confirm == "Start New Game")
+        #expect(ui.pendingNewGame?.message == "This starts a new game, and the current one will be lost.")
+    }
+
+    @Test func resumingAHardCoreGameRemembersIt() {
+        let store = makeStore(drawCount: 1)
+        var remembered: [Bool] = []
+        store.rememberHardCore = { remembered.append($0) }
+        store.resume(from: SolitaireEngine.newGame(drawCount: 3, seed: 5, hardCore: true))
+        #expect(store.lastHardCore && remembered == [true])
+        store.newGame()
+        #expect(store.state.isHardCore && store.state.drawCount == 3)
+    }
+
     @Test func anInvalidCountBecomesDrawOne() {
         let store = makeStore(drawCount: 3)
         AppUI().requestNewGame(drawCount: 7, store: store)

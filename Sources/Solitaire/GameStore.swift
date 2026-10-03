@@ -35,6 +35,12 @@ final class GameStore {
     }
     /// Stores the draw-count setting (UserDefaults in the app; nil in tests).
     @ObservationIgnored var rememberDrawCount: ((Int) -> Void)?
+    /// Whether the last deal (or the game resumed) is Hard Core: what New Game deals next.
+    /// Remembered straight away, like the draw count; only dealing changes it.
+    private(set) var lastHardCore: Bool {
+        didSet { if lastHardCore != oldValue { rememberHardCore?(lastHardCore) } }
+    }
+    @ObservationIgnored var rememberHardCore: ((Bool) -> Void)?
     /// The card being dragged (with its run), from `beginDrag` until `drop` or `cancelDrag`.
     private(set) var pendingDrag: PendingDrag?
     /// The latest thing worth a haptic (iOS): a move, a draw, a win. Nothing on failure.
@@ -66,10 +72,13 @@ final class GameStore {
     @ObservationIgnored private var finishing: Task<Void, Never>?
 
     /// - Parameter makeSeed: where deal seeds come from; tests inject a fixed sequence.
-    init(drawCount: Int = 1, makeSeed: @escaping () -> UInt64 = { UInt64.random(in: .min ... .max) }) {
+    init(drawCount: Int = 1, hardCore: Bool = false,
+         makeSeed: @escaping () -> UInt64 = { UInt64.random(in: .min ... .max) }) {
         self.makeSeed = makeSeed
         lastDrawCount = Self.validDrawCount(drawCount)
-        state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed())
+        lastHardCore = hardCore
+        state = SolitaireEngine.newGame(drawCount: Self.validDrawCount(drawCount), seed: makeSeed(),
+                                        hardCore: hardCore)
     }
 
     /// Nothing undoes a win: a won game cannot be un-won (spec decision).
@@ -88,11 +97,13 @@ final class GameStore {
 
     /// Deals a new game. An out-of-range draw count (e.g. a corrupted setting) becomes 1; the
     /// choice is remembered for the next deal.
-    func newGame(drawCount: Int) {
+    /// `hardCore`: nil keeps the last deal's Hard Core mode.
+    func newGame(drawCount: Int, hardCore: Bool? = nil) {
         stopAutoFinish()
         pendingDrag = nil
         lastDrawCount = Self.validDrawCount(drawCount)
-        state = SolitaireEngine.newGame(drawCount: lastDrawCount, seed: makeSeed())
+        lastHardCore = hardCore ?? lastHardCore
+        state = SolitaireEngine.newGame(drawCount: lastDrawCount, seed: makeSeed(), hardCore: lastHardCore)
         undoStack.removeAll()
         updateClock()
     }
@@ -101,6 +112,7 @@ final class GameStore {
     func resume(from saved: GameState) {
         stopAutoFinish()
         lastDrawCount = Self.validDrawCount(saved.drawCount)
+        lastHardCore = saved.isHardCore
         state = saved
         undoStack.removeAll()
         updateClock()
@@ -277,8 +289,8 @@ final class GameStore {
             store = GameStore(drawCount: drawCount)
             store.resume(from: saved)
             store.saver = saver
-        case .deal(let count):
-            store = GameStore(drawCount: count)
+        case .deal(let count, let hardCore):
+            store = GameStore(drawCount: count, hardCore: hardCore)
             store.saver = saver
             store.saveNow()
         }

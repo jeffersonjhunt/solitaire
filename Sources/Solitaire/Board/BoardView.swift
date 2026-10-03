@@ -199,13 +199,14 @@ struct BoardView: View {
     private func outlines(_ layout: BoardLayout) -> some View {
         let w = layout.metrics.cardWidth
         let state = store.state
-        let redeal = state.stock.isEmpty && !state.waste.isEmpty
+        let redeal = SolitaireEngine.canRedeal(state)
+        let outOfPasses = SolitaireEngine.isOutOfPasses(state)        // Hard Core: ✕, nothing to do
         let stockLabel = !state.stock.isEmpty ? "Stock, \(state.stock.count) cards"
-            : redeal ? "Stock, empty. Redeal" : "Stock, empty"
+            : redeal ? "Stock, empty. Redeal" : outOfPasses ? "Stock, empty. No passes left" : "Stock, empty"
         return ZStack(alignment: .topLeading) {
             // VoiceOver: the stock is always this one element (its cards are hidden). Taps on the
             // stock's cards reach `tapStock` through the cards themselves; this handles the empty stock.
-            outline(layout.slot(.stock), w, symbol: redeal ? "arrow.counterclockwise" : nil,
+            outline(layout.slot(.stock), w, symbol: redeal ? "arrow.counterclockwise" : outOfPasses ? "xmark" : nil,
                     label: stockLabel, spoken: true, action: { store.tapStock() })
             outline(layout.slot(.waste), w, label: "Waste, empty", spoken: state.waste.isEmpty)
             ForEach(0..<4, id: \.self) { f in
