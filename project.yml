@@ -40,9 +40,13 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
-        # Mac: App Sandbox with no capabilities beyond the defaults — no network client/server
-        # entitlement, so the app cannot open a connection (spec: no network code at all).
+        # Game Center and iCloud's key-value store (spec "Scores"); everything else is the defaults.
+        CODE_SIGN_ENTITLEMENTS: Config/Solitaire.entitlements
+        # Mac: App Sandbox, plus outgoing connections — Game Center needs them (since 1.1 the app is
+        # no longer network-free: Game Center and iCloud, both Apple's; still no network code of
+        # its own and nothing incoming).
         ENABLE_APP_SANDBOX[sdk=macosx*]: YES
+        ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*]: YES
         ENABLE_HARDENED_RUNTIME[sdk=macosx*]: YES
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES

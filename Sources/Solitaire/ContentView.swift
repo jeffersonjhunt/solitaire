@@ -7,6 +7,8 @@ import SolitaireEngine
 struct ContentView: View {
     let store: GameStore
     let ui: AppUI
+    let scores: ScoreBook
+    let gameCenter: GameCenter
     @State private var dismissedWinSeed: UInt64?
     /// The win whose cascade has finished; the win sheet waits for it, so the cascade plays uncovered.
     @State private var cascadeFinishedSeed: UInt64?
@@ -14,6 +16,9 @@ struct ContentView: View {
     @State private var boardWidth: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var cardFace = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var cardBack = CardBackStyle.classicBlue
     @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
@@ -68,6 +73,12 @@ struct ContentView: View {
                     }
             }
         }
+        .sheet(isPresented: Binding(get: { ui.showingScores }, set: { ui.showingScores = $0 })) {
+            ScoresView(scores: scores, gameCenter: gameCenter, drawCount: store.state.drawCount) {
+                ui.showingScores = false
+            }
+            .presentationBackground(DialogColors.card)
+        }
         .sheet(isPresented: Binding(get: { ui.showingAbout }, set: { ui.showingAbout = $0 })) {
             NavigationStack {
                 AboutView()
@@ -95,14 +106,15 @@ struct ContentView: View {
                     WinCard(drawCount: store.state.drawCount, hardCore: store.state.isHardCore,
                             score: store.score, moves: store.state.moveCount,
                             elapsed: store.state.elapsed, passes: store.state.passes,
-                            undos: store.state.undos, wide: wideDialogs,
+                            undos: store.state.undos, topTenRank: scores.rank(ofWin: store.state),
+                            wide: wideDialogs, showTopTen: showScores,
                             newGame: { store.newGame(drawCount: $0) },
                             close: { dismissedWinSeed = store.state.seed })
                 }
                 .transition(.opacity)
             } else if ui.showingMore {
                 DialogScrim(bottom: !wideDialogs, maxWidth: 420, outside: { ui.showingMore = false }) {
-                    MoreCard(ui: ui)
+                    MoreCard(ui: ui, showScores: showScores)
                 }
                 .transition(.opacity)
             }
@@ -111,6 +123,16 @@ struct ContentView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: ui.showingMore)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: winSheetShown.wrappedValue)
         .onChange(of: winSheetShown.wrappedValue, initial: true) { _, shown in ui.showingWinCard = shown }
+        .task { gameCenter.signIn() }                                  // Game Center's own prompt, once
+    }
+
+    /// Scores: a sheet on iPhone and iPad, its window on the Mac.
+    private func showScores() {
+        #if os(macOS)
+        openWindow(id: ScoresWindow.id)
+        #else
+        ui.showingScores = true
+        #endif
     }
 
     /// Cards centred with their buttons in a row (iPad, the Mac, a phone held sideways), rather
@@ -152,7 +174,7 @@ struct TableBackground: View {
 }
 
 #Preview {
-    ContentView(store: GameStore(), ui: AppUI())
+    ContentView(store: GameStore(), ui: AppUI(), scores: ScoreBook(local: .standard, cloud: nil), gameCenter: GameCenter(enabled: false))
 }
 
 #if os(macOS)

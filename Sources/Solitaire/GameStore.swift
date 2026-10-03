@@ -41,6 +41,8 @@ final class GameStore {
         didSet { if lastHardCore != oldValue { rememberHardCore?(lastHardCore) } }
     }
     @ObservationIgnored var rememberHardCore: ((Bool) -> Void)?
+    /// Called once when a move wins the game (spec "Scores": the app records it).
+    @ObservationIgnored var onWin: ((GameState) -> Void)?
     /// The card being dragged (with its run), from `beginDrag` until `drop` or `cancelDrag`.
     private(set) var pendingDrag: PendingDrag?
     /// The latest thing worth a haptic (iOS): a move, a draw, a win. Nothing on failure.
@@ -219,6 +221,7 @@ final class GameStore {
         record()
         SolitaireEngine.apply(move, to: &state)
         announce(state.isWon ? .win : .move)
+        if state.isWon { onWin?(state) }
         updateClock()
     }
 
