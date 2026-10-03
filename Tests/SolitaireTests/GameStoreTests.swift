@@ -60,7 +60,7 @@ func legalMoves(_ s: GameState) -> [Move] {
         let before = store.state
         store.undo()
         #expect(store.state.elapsed == before.elapsed, "time isn't taken back")
-        #expect(store.state.undos == 1 && store.score == 600 - 3)
+        #expect(store.state.undos == 1 && store.score == 0, "−3 on nothing is still 0")
         store.tapStock(); store.undo()
         #expect(store.state.undos == 2, "and every undo counts")
     }

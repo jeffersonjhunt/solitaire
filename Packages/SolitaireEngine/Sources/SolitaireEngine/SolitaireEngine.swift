@@ -175,16 +175,25 @@ public enum SolitaireEngine {
 
     // MARK: Scoring (spec "Scoring")
 
-    public static let startingScore = 600
+    /// The most a win's time bonus can be: all of it, under a minute.
+    public static let maxTimeBonus = 600
 
-    /// The score, worked out from the game itself: 600, +5 per card on a foundation, +35 per
-    /// complete suit, −3 per undo, −100 per redeal, less the time penalty; never below 0.
+    /// The score: the play score, plus the time bonus once the game is won.
     public static func score(_ state: GameState) -> Int {
+        playScore(state) + (isWon(state) ? timeBonus(seconds: Int(state.elapsed)) : 0)
+    }
+
+    /// The points earned in play, worked out from the game itself: +5 per card on a foundation,
+    /// +35 per complete suit, −3 per undo, −100 per redeal; never below 0.
+    public static func playScore(_ state: GameState) -> Int {
         let onFoundations = state.foundations.reduce(0) { $0 + $1.count }
         let suits = state.foundations.filter { $0.count == 13 }.count
-        let raw = startingScore + 5 * onFoundations + 35 * suits
-            - 3 * state.undos - 100 * state.redeals - timePenalty(seconds: Int(state.elapsed))
-        return max(raw, 0)
+        return max(5 * onFoundations + 35 * suits - 3 * state.undos - 100 * state.redeals, 0)
+    }
+
+    /// What a win adds for its time: 600 less the time penalty, never below 0.
+    public static func timeBonus(seconds: Int) -> Int {
+        max(maxTimeBonus - timePenalty(seconds: seconds), 0)
     }
 
     /// Free for the first minute; then 1 point a second in the second minute, 2 in the third, and so

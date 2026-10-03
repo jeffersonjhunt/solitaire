@@ -339,10 +339,10 @@ final class SolitaireUITests: XCTestCase {
                       "Game Center is off under tests")
     }
 
-    /// The header leads with the score (spec "Scoring"): 600 on a fresh deal.
+    /// The header leads with the score (spec "Scoring"): 0 on a fresh deal.
     func testTheHeaderShowsTheScore() {
         let app = launch(seed: 4)
-        XCTAssertTrue(app.descendants(matching: .any)["Score 600"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["Score 0"].waitForExistence(timeout: 5))
     }
 
     /// The draw chip switches mode by dealing: at once on a fresh deal, asked first mid-game; the

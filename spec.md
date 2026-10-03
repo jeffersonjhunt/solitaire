@@ -36,7 +36,7 @@ Legal moves the engine must allow, and nothing else:
 
 Draw modes: draw 1 or draw 3, fixed for the life of a deal; switching mode deals a new game (see "New games and the draw mode"). Draw 3 turns up to three cards to the waste and only the topmost is playable. Redeals are unlimited: with the stock empty, tapping it returns the waste to the stock in reverse order, face down, and counts as one move. The game counts its **passes** through the deck: the first trip through the stock is pass 1, and each redeal starts another (`redeals` in the state; passes = redeals + 1). Undo takes a redeal back with the rest of the move. A game saved before passes were counted resumes with none.
 
-The game is won when all four foundations hold 13 cards. There is no scoring and no loss state — a stuck game is simply a game the player restarts or undoes out of.
+The game is won when all four foundations hold 13 cards (for its score see "Scoring"). There is no loss state — a stuck game is simply a game the player restarts or undoes out of.
 
 ## Architecture
 
@@ -231,23 +231,31 @@ Rules every style keeps:
 
 ## Scoring
 
-Every game starts at **600**. The score is worked out from the game itself — never kept as a
-running total — so it cannot drift from the board:
+Every game starts at **0** (decision 2026-10-03, U24; 1.0 builds started at 600 and took time
+off the score). The score is a **play score**, plus a **time bonus** once the game is won. Both
+are worked out from the game itself — never kept as a running total — so they cannot drift from
+the board:
 
-| What | Points |
+| Play score | Points |
 |---|---|
 | Each card on a foundation | +5 (so a card taken back off costs 5) |
 | Each complete suit (13 on a foundation) | +35 (a whole suit is worth 100) |
 | Each undo | −3 (and the undone move's points go with it) |
 | Each redeal (pass after the first) | −100 |
-| Time, from 1:00 | −1 a second from 1:00 to 2:00, −2 from 2:00 to 3:00, and so on |
-| Floor | 0 |
+| Floor | 0 — of the total, so a cost taken early is still owed when points come later |
 
-A one-pass win in under a minute scores 1000; a one-pass win with no undos scores 940 at 2:00,
-820 at 3:00, 640 at 4:00, 400 at 5:00 and 0 from about 6:30. Auto-finish moves score like any
-others. The score is live: **SCORE** leads the header (SCORE, TIME, MOVES and the draw chip, on
-every size) and ticks down with the clock; VoiceOver reads "Score 754". The win card shows it
-large over MOVES, TIME, PASSES and UNDOS. A game saved before undos were counted resumes with none.
+| Time bonus, on a win only | Points |
+|---|---|
+| Up to 1:00 | 600 |
+| From 1:00 | less 1 a second from 1:00 to 2:00, 2 from 2:00 to 3:00, and so on |
+| Floor | 0 (from 5:00) |
+
+A one-pass win with no undos earns 400 in play, so it scores 1000 under a minute, 940 at 2:00,
+820 at 3:00, 640 at 4:00 and 400 from 5:00. Auto-finish moves score like any others. **SCORE**
+leads the header (SCORE, TIME, MOVES and the draw chip, on every size) and shows the play score
+while the game goes on — time does not touch it; VoiceOver reads "Score 245". Once won it shows
+the whole score. The win card shows the whole score large, "PLAY 294 + TIME BONUS 360" under it
+(VoiceOver: "Score 654, play 294 plus time bonus 360"), then MOVES, TIME, PASSES and UNDOS. A game saved before undos were counted resumes with none.
 
 ## Scores: your Top 10 and Game Center
 
