@@ -231,133 +231,40 @@ private struct WinDecay: View {
     let foundations: [[Card]]
     let layout: BoardLayout
     let onFinished: () -> Void
-    @Environment(\.displayScale) private var displayScale
-    @State private var masks: DecayMasks?
 
     var body: some View {
         let deepest = foundations.map(\.count).max() ?? 0
-        let width = layout.metrics.cardWidth, height = layout.metrics.cardHeight
+        let width = layout.metrics.cardWidth
         WinTimelineCanvas(cards: foundations.flatMap { $0 }, cardWidth: width,
                           duration: DecayTimeline.duration(deepest: deepest), onFinished: onFinished) { context, _, t in
             for (f, pile) in foundations.enumerated() {
                 let slot = layout.slot(.foundation(f))
                 let center = CGPoint(x: slot.midX, y: slot.midY)
-                let rect = CGRect(x: slot.midX - width / 2, y: slot.midY - height / 2, width: width, height: height)
                 // The card being eaten away and the one under it (which shows through the holes).
                 let depths = (0..<pile.count).filter { DecayTimeline.progress(pile: f, depth: $0, at: t) < 1 }.prefix(2)
                 for depth in depths.reversed() {
                     let card = pile[pile.count - 1 - depth]
                     guard let symbol = context.resolveSymbol(id: card.id) else { continue }
                     let p = DecayTimeline.progress(pile: f, depth: depth, at: t)
-                    guard p > 0, let frame = masks?.frame(variant: card.id, progress: p) else {
+                    if p <= 0 {
                         context.draw(symbol, at: center)
-                        continue
-                    }
-                    context.drawLayer { layer in
-                        layer.draw(symbol, at: center)
-                        layer.blendMode = .sourceAtop                 // the rim only over the card
-                        layer.draw(Image(decorative: frame.rim, scale: frame.scale), in: rect)
-                        layer.blendMode = .destinationIn              // then cut the holes
-                        layer.draw(Image(decorative: frame.mask, scale: frame.scale), in: rect)
+                    } else {
+                        context.drawLayer { layer in
+                            layer.addFilter(.layerShader(Dissolve.shader(progress: p, seed: card.id, cardWidth: width),
+                                                         maxSampleOffset: .zero))
+                            layer.draw(symbol, at: center)
+                        }
                     }
                 }
             }
-        }
-        .task {
-            let size = CGSize(width: width, height: height), scale = displayScale
-            masks = await Task.detached(priority: .userInitiated) { DecayMasks(size: size, scale: scale) }.value
         }
     }
 }
 
-/// The dissolve for Decay, without a shader: a few fractal-noise fields made once at the card's
-/// pixel size; each frame thresholds one into a mask (visible where the noise is above the rising
-/// threshold) and a burnt-orange rim just ahead of the holes. Thresholds are taken in 48 steps
-/// and cached.
-final class DecayMasks: @unchecked Sendable {
-    static let variants = 4
-    static let steps = 48
-    static let rim: Float = 0.07
-
-    struct Frame { let mask: CGImage; let rim: CGImage; let scale: CGFloat }
-
-    let scale: CGFloat
-    private let width: Int, height: Int
-    private let fields: [[Float]]
-    private var cache: [Int: Frame] = [:]
-
-    init(size: CGSize, scale: CGFloat) {
-        self.scale = scale
-        width = max(Int(size.width * scale), 1)
-        height = max(Int(size.height * scale), 1)
-        let cell = Float(size.width * scale) / 7
-        fields = (0..<Self.variants).map { v in
-            Self.field(width: max(Int(size.width * scale), 1), height: max(Int(size.height * scale), 1),
-                       cell: cell, seed: Float(v) * 31.7)
-        }
-    }
-
-    func frame(variant: Int, progress: Double) -> Frame? {
-        let level = min(Int(progress * Double(Self.steps)), Self.steps)
-        let key = (variant % Self.variants) * 1000 + level
-        if let hit = cache[key] { return hit }
-        let threshold = -Self.rim + (1 + Self.rim) * Float(level) / Float(Self.steps)
-        let field = fields[variant % Self.variants]
-        var mask = [UInt8](repeating: 0, count: width * height * 4)     // white, opaque where the card stays
-        var rim = [UInt8](repeating: 0, count: width * height * 4)
-        for i in 0..<(width * height) {
-            let n = field[i]
-            if n >= threshold { mask[i * 4] = 255; mask[i * 4 + 1] = 255; mask[i * 4 + 2] = 255; mask[i * 4 + 3] = 255 }
-            if n >= threshold, n < threshold + Self.rim {
-                let a = UInt8(255 * (1 - (n - threshold) / Self.rim))
-                rim[i * 4] = UInt8(Float(a) * 0.8); rim[i * 4 + 1] = UInt8(Float(a) * 0.333); rim[i * 4 + 3] = a
-            }
-        }
-        guard let m = Self.image(mask, width: width, height: height),
-              let r = Self.image(rim, width: width, height: height) else { return nil }
-        let frame = Frame(mask: m, rim: r, scale: scale)
-        cache[key] = frame
-        return frame
-    }
-
-    /// Premultiplied RGBA. (An alpha-only image would be smaller, but Core Graphics won't make one
-    /// with a colour space, and drawing needs one.)
-    private static func image(_ bytes: [UInt8], width: Int, height: Int) -> CGImage? {
-        guard let provider = CGDataProvider(data: Data(bytes) as CFData) else { return nil }
-        return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
-                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                       provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
-    }
-
-    /// Fractal value noise, 0…1, four octaves.
-    static func field(width: Int, height: Int, cell: Float, seed: Float) -> [Float] {
-        func hash(_ x: Float, _ y: Float) -> Float {
-            var px = (x * 123.34).truncatingRemainder(dividingBy: 1), py = (y * 456.21).truncatingRemainder(dividingBy: 1)
-            let d = px * (px + 45.32) + py * (py + 45.32)
-            px += d; py += d
-            let v = (px * py).truncatingRemainder(dividingBy: 1)
-            return v < 0 ? v + 1 : v
-        }
-        func noise(_ x: Float, _ y: Float) -> Float {
-            let ix = x.rounded(.down), iy = y.rounded(.down), fx = x - ix, fy = y - iy
-            let a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1)
-            let ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy)
-            return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy
-        }
-        var out = [Float](repeating: 0, count: width * height)
-        for y in 0..<height {
-            for x in 0..<width {
-                var px = Float(x) / cell + seed, py = Float(y) / cell + seed * 0.7
-                var v: Float = 0, amplitude: Float = 0.5
-                for _ in 0..<4 {
-                    v += amplitude * noise(px, py)
-                    px = px * 2.03 + 17; py = py * 2.03 + 17
-                    amplitude *= 0.5
-                }
-                out[y * width + x] = v / 0.9375
-            }
-        }
-        return out
+/// The dissolve shader (Dissolve.metal), as Decay and the tests use it.
+enum Dissolve {
+    static func shader(progress: Double, seed: Int, cardWidth: CGFloat) -> Shader {
+        ShaderLibrary.dissolve(.float(Float(progress)), .float(Float(seed)), .float(Float(cardWidth / 7)))
     }
 }
 

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 import Testing
 @testable import Solitaire
 
@@ -53,19 +54,27 @@ import Testing
         for pile in 0..<4 { #expect(DecayTimeline.progress(pile: pile, depth: 12, at: end) == 1, "all gone at the end") }
     }
 
-    /// The masks keep the whole card at the start and none of it at the end, with holes between.
-    @Test func masksGoFromWholeToGone() throws {
-        let masks = DecayMasks(size: CGSize(width: 20, height: 28), scale: 1)
+    /// The real shader keeps the whole card at the start, eats it away part way, and leaves
+    /// nothing at the end.
+    @MainActor @Test func theShaderGoesFromWholeToGone() throws {
         func opaque(_ p: Double) throws -> Double {
-            let frame = try #require(masks.frame(variant: 3, progress: p))
-            let data = try #require(frame.mask.dataProvider?.data as Data?)
-            let alpha = stride(from: 3, to: data.count, by: 4).map { data[$0] }     // RGBA: the alpha bytes
-            return Double(alpha.filter { $0 > 0 }.count) / Double(alpha.count)
+            let card = Rectangle().fill(.white).frame(width: 70, height: 98)
+                .layerEffect(Dissolve.shader(progress: p, seed: 7, cardWidth: 70), maxSampleOffset: .zero)
+            let renderer = ImageRenderer(content: card)
+            renderer.scale = 1
+            let image = try #require(renderer.cgImage)
+            let data = try #require(image.dataProvider?.data as Data?)
+            let bpp = image.bitsPerPixel / 8, row = image.bytesPerRow
+            var visible = 0
+            for y in 0..<image.height {
+                for x in 0..<image.width where data[y * row + x * bpp + 3] > 0 { visible += 1 }
+            }
+            return Double(visible) / Double(image.width * image.height)
         }
-        #expect(try opaque(0) == 1)
+        #expect(try opaque(0) == 1, "untouched")
         let half = try opaque(0.5)
         #expect(half > 0.05 && half < 0.95, "partly eaten away: \(half)")
-        #expect(try opaque(1) == 0)
+        #expect(try opaque(1) == 0, "gone")
     }
 }
 

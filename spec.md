@@ -291,7 +291,9 @@ the win card at once as before. Saved as `winAnimation`; an unknown value reads 
   slight sway and spin, straight off the bottom.
 - **Decay** — each pile dissolves from the top down: the top card is eaten away along ragged,
   noise-shaped edges with a thin burnt-orange rim, the card beneath showing through the holes; each
-  card over 0.55 s, the piles a quarter-second apart, until all four are gone.
+  card over 0.55 s, the piles a quarter-second apart, until all four are gone. The dissolve is a Metal
+  shader (fractal noise against a rising threshold), so it is continuous at the display's frame
+  rate; building needs Xcode's Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`).
 - **Shuffle** — the cards gather into two half-piles, riffle into one deck, turn face down and
   slide onto the draw pile, where they stay. It is only an animation: the next game is dealt as
   usual.
