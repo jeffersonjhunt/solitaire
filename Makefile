@@ -163,11 +163,13 @@ RELEASE_XCB  := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration 
 archive: need-team need-asc generate ## Release archives for iOS and the Mac (build number: UTC time)
 	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR) && echo $(BUILD_NUMBER) > $(RELEASE_DIR)/build-number
 	@echo ">> archiving 1.0 ($(BUILD_NUMBER))"
-	@# iOS unsigned: Apple signs it at export. Signing here would need a development profile, and
-	@# those need a registered device, which an upload has no reason to depend on.
-	$(RELEASE_XCB) -destination 'generic/platform=iOS' -archivePath $(RELEASE_DIR)/Solitaire-ios.xcarchive \
-	  CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO archive
-	@# Mac signed with the team: that is what embeds the sandbox entitlement the store requires.
+	@# Both signed with the team: signing is what embeds the entitlements (Game Center, iCloud's
+	@# key-value store, the Mac sandbox) — an unsigned archive exported without them, and the
+	@# upload was accepted all the same (U21). The development profile this needs covers the
+	@# registered devices; export then re-signs for the App Store.
+	$(UNLOCK) $(RELEASE_XCB) -destination 'generic/platform=iOS' -archivePath $(RELEASE_DIR)/Solitaire-ios.xcarchive \
+	  CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) $(KEYCHAIN_FLAG) \
+	  -allowProvisioningUpdates $(ASC_AUTH) archive
 	$(UNLOCK) $(RELEASE_XCB) -destination 'generic/platform=macOS' -archivePath $(RELEASE_DIR)/Solitaire-macos.xcarchive \
 	  CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=$(DEV_TEAM) $(KEYCHAIN_FLAG) \
 	  -allowProvisioningUpdates $(ASC_AUTH) archive
