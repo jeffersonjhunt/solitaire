@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var face = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var back = CardBackStyle.classicBlue
     @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
+    @AppStorage(AppSettings.winAnimationKey, store: AppSettings.defaults) private var winAnimation = WinAnimation.cascade
     @AppStorage(AppSettings.askBeforeEndingGameKey, store: AppSettings.defaults) private var askBeforeEndingGame = true
 
     private static let previewAce = Card(suit: .spades, rank: 1, isFaceUp: true)
@@ -65,6 +66,16 @@ struct SettingsView: View {
                     .accessibilityLabel("Ask before ending a game")
                     .accessibilityHint("Asks before New Game or the draw switch replaces a game in progress")
                     .tint(TableColors.accent)
+            }
+            Section {
+                Picker("Animation", selection: $winAnimation) {
+                    ForEach(WinAnimation.allCases) { Text($0.title).tag($0) }
+                }
+                .tint(TableColors.accent)
+            } header: {
+                Text("Win animation")
+            } footer: {
+                Text("Random picks one of the four for each win. With Reduce Motion on, none plays.")
             }
             Section("Card face") {
                 StyleChooser(selection: $face) { style in
