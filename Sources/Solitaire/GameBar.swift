@@ -27,7 +27,7 @@ enum TableColors {
     static let onAccent = Color(red: 0.039, green: 0.039, blue: 0.039)       // #0A0A0A
 }
 
-/// Moves, time and the draw chip, over the board — the same on every platform, its edges in line
+/// Score, time, moves and the draw chip, over the board — the same on every platform, its edges in line
 /// with the outer columns (`width`, the board's used width). `compact`: the smaller form that sits
 /// inside the bar on a phone held sideways. The chip shows this game's draw mode and switches it.
 struct GameHeader: View {
@@ -51,13 +51,17 @@ struct GameHeader: View {
 
     private var stats: some View {
         HStack(alignment: .bottom, spacing: compact ? 14 : 22) {
-            stat("MOVES", "\(store.state.moveCount)")
+            stat("SCORE", "\(store.score)")
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(store.state.moveCount) moves")
+                .accessibilityLabel("Score \(store.score)")
                 .accessibilityAddTraits(.isStaticText)
             stat("TIME", Self.clock(store.state.elapsed))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Time \(Self.spokenClock(store.state.elapsed))")
+                .accessibilityAddTraits(.isStaticText)
+            stat("MOVES", "\(store.state.moveCount)")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(store.state.moveCount) moves")
                 .accessibilityAddTraits(.isStaticText)
             if !compact { Spacer(minLength: 8) }
             drawChip

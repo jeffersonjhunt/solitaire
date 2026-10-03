@@ -93,8 +93,9 @@ struct ContentView: View {
             } else if winSheetShown.wrappedValue {
                 DialogScrim(bottom: !wideDialogs, maxWidth: 480) {
                     WinCard(drawCount: store.state.drawCount, hardCore: store.state.isHardCore,
-                            moves: store.state.moveCount,
-                            elapsed: store.state.elapsed, passes: store.state.passes, wide: wideDialogs,
+                            score: store.score, moves: store.state.moveCount,
+                            elapsed: store.state.elapsed, passes: store.state.passes,
+                            undos: store.state.undos, wide: wideDialogs,
                             newGame: { store.newGame(drawCount: $0) },
                             close: { dismissedWinSeed = store.state.seed })
                 }

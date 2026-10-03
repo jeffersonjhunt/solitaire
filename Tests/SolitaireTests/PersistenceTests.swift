@@ -21,7 +21,7 @@ private func tempSaveURL() -> URL {
     @Test(arguments: [
         "won", "3 foundations", "8 columns", "51 cards", "duplicate card", "rank 14", "draw 2",
         "negative moves", "negative time", "negative redeals", "more redeals than moves",
-        "hard core past its passes",
+        "hard core past its passes", "negative undos",
         "face-down column top", "face-up stock", "face-down waste", "foundation out of order",
         "mixed foundation", "unbuilt run",
     ])
@@ -40,6 +40,7 @@ private func tempSaveURL() -> URL {
         case "negative redeals": s.redeals = -1
         case "more redeals than moves": s.moveCount = 3; s.redeals = 4
         case "hard core past its passes": s.isHardCore = true; s.drawCount = 1; s.moveCount = 30; s.redeals = 1
+        case "negative undos": s.undos = -1
         case "face-down column top": s.tableau[6][6].isFaceUp = false
         case "face-up stock": s.stock[0].isFaceUp = true
         case "face-down waste":

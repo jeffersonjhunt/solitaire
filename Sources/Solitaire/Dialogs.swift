@@ -152,9 +152,11 @@ struct QuestionCard: View {
 struct WinCard: View {
     let drawCount: Int
     var hardCore = false
+    let score: Int
     let moves: Int
     let elapsed: TimeInterval
     let passes: Int
+    let undos: Int
     var wide = false
     let newGame: (Int) -> Void
     let close: () -> Void
@@ -173,10 +175,25 @@ struct WinCard: View {
                     .accessibilityFocused($titleFocused)
             }
             .frame(maxWidth: .infinity)
+            VStack(spacing: 8) {
+                Text("SCORE")
+                    .font(AppFont.mono(11, relativeTo: .caption2))
+                    .tracking(1.5)
+                    .foregroundStyle(DialogColors.label)
+                Text("\(score)")
+                    .font(AppFont.mono(wide ? 52 : 60, bold: true, relativeTo: .largeTitle))
+                    .foregroundStyle(DialogColors.title)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Score \(score)")
             HStack(spacing: 8) {
                 figure("MOVES", "\(moves)", spoken: "\(moves) moves")
                 figure("TIME", GameHeader.clock(elapsed), spoken: "Time \(GameHeader.spokenClock(elapsed))")
                 figure("PASSES", "\(passes)", spoken: passes == 1 ? "1 pass" : "\(passes) passes")
+                figure("UNDOS", "\(undos)", spoken: undos == 1 ? "1 undo" : "\(undos) undos")
             }
             .padding(.vertical, 14)
             .overlay(alignment: .top) { DialogColors.hairline.frame(height: 1) }

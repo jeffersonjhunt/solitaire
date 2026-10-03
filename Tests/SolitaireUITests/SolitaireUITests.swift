@@ -51,6 +51,9 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(card.exists, "the win card")
         XCTAssertTrue(card.buttons["New Game · Draw 1"].exists && card.buttons["Draw 3 instead"].exists)
         XCTAssertTrue(card.descendants(matching: .any)["1 pass"].exists, "passes on the win card")
+        XCTAssertTrue(card.descendants(matching: .any)["0 undos"].exists, "undos on the win card")
+        XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Score '")).firstMatch.exists,
+                      "the score on the win card")
         card.buttons["Close"].press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForNonExistence(timeout: 5), "Close dismisses it")
     }
@@ -287,6 +290,12 @@ final class SolitaireUITests: XCTestCase {
         ask?.buttons["Cancel"].press()
         XCTAssertTrue(app.descendants(matching: .any)["confirmation"].waitForNonExistence(timeout: 3))
         XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw one, Hard Core", "Cancel keeps it")
+    }
+
+    /// The header leads with the score (spec "Scoring"): 600 on a fresh deal.
+    func testTheHeaderShowsTheScore() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Score 600"].waitForExistence(timeout: 5))
     }
 
     /// The draw chip switches mode by dealing: at once on a fresh deal, asked first mid-game; the

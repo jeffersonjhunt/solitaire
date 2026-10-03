@@ -21,8 +21,9 @@ func legalMoves(_ s: GameState) -> [Move] {
 }
 
 @MainActor @Suite struct Undo {
-    /// Acceptance: undo from any point returns the exact previous state, including face-up flips
-    /// and redeals, for 100 random moves from a fixed seed.
+    /// Acceptance: undo from any point returns the exact previous board, moves and passes, including
+    /// face-up flips and redeals, for 100 random moves from a fixed seed — the undo count rising by
+    /// one each time (spec "Scoring").
     @Test func hundredRandomMovesUndoExactly() {
         let store = makeStore()
         var rng = SplitMix64(seed: 7)
@@ -43,11 +44,25 @@ func legalMoves(_ s: GameState) -> [Move] {
             history.append(store.state)
         }
         #expect(flips > 0 && redeals > 0, "the walk must include flips (\(flips)) and redeals (\(redeals))")
-        for expected in history.dropLast().reversed() {
+        for (n, var expected) in history.dropLast().reversed().enumerated() {
             store.undo()
+            expected.undos = n + 1
             #expect(store.state == expected)
         }
         #expect(!store.canUndo)
+    }
+
+    /// Undo keeps the clock's time and counts itself; the undone move's points go with it.
+    @Test func undoKeepsTheClockAndCountsItself() {
+        let store = makeStore()
+        store.tapStock()
+        store.tick(); store.tick()
+        let before = store.state
+        store.undo()
+        #expect(store.state.elapsed == before.elapsed, "time isn't taken back")
+        #expect(store.state.undos == 1 && store.score == 600 - 3)
+        store.tapStock(); store.undo()
+        #expect(store.state.undos == 2, "and every undo counts")
     }
 
     /// Undo takes a redeal back, pass count included.
@@ -64,8 +79,9 @@ func legalMoves(_ s: GameState) -> [Move] {
         let store = makeStore()
         for _ in 0..<350 { store.tapStock() }
         #expect(store.undoStack.count == GameStore.undoLimit)
-        let oldestKept = store.undoStack.first
+        var oldestKept = store.undoStack.first
         for _ in 0..<GameStore.undoLimit { store.undo() }
+        oldestKept?.undos = GameStore.undoLimit                    // every undo is counted (spec "Scoring")
         #expect(store.state == oldestKept)
         #expect(!store.canUndo)
     }

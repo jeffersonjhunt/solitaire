@@ -75,6 +75,10 @@ enum HowToPlay {
                 "**Back from a foundation:** drag its top card onto a column, under the same colour and rank rule.",
                 "A face-down card uncovered at the bottom of a column turns over by itself.",
             ]),
+            Section(title: "Scoring", lines: [
+                "Every game starts at **600**: **+5** for each card on a foundation and **+35** for each finished suit; **−3** for each undo and **−100** for each pass through the deck after the first.",
+                "Time costs too, after the first minute: 1 point a second in the second minute, 2 in the third, and so on. The score never goes below 0 — a one-pass win in under a minute scores **1000**.",
+            ]),
             Section(title: "Hard Core", lines: [
                 "A harder game: **one pass** through the deck in Draw 1, **three** in Draw 3. When they're used up the stock shows ✕. Turn it on in **Settings** — changing it starts a new game.",
             ]),
