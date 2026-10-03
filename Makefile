@@ -4,6 +4,9 @@
 # The .xcodeproj is generated from project.yml by the XcodeGen pinned in .xcodegen-version
 # (tools/xcodegen builds it once into a shared cache).
 
+# The version testers and the store see: project.yml's MARKETING_VERSION.
+VERSION := $(shell sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"/\1/p' project.yml)
+
 .DEFAULT_GOAL := build
 
 PROJECT   := Solitaire.xcodeproj
@@ -162,7 +165,7 @@ RELEASE_XCB  := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration 
 
 archive: need-team need-asc generate ## Release archives for iOS and the Mac (build number: UTC time)
 	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR) && echo $(BUILD_NUMBER) > $(RELEASE_DIR)/build-number
-	@echo ">> archiving 1.0 ($(BUILD_NUMBER))"
+	@echo ">> archiving $(VERSION) ($(BUILD_NUMBER))"
 	@# Both signed with the team: signing is what embeds the entitlements (Game Center, iCloud's
 	@# key-value store, the Mac sandbox) — an unsigned archive exported without them, and the
 	@# upload was accepted all the same (U21). The development profile this needs covers the
@@ -199,7 +202,7 @@ upload: need-asc ## Upload exactly the checked packages to App Store Connect (Te
 	  echo ">> uploading $$f"; \
 	  xcrun altool --upload-package "$$f" --api-key $(ASC_KEY_ID) --api-issuer $(ASC_ISSUER_ID) \
 	    --p8-file-path "$(ASC_KEY_PATH)" || exit 1; done
-	@echo ">> uploaded 1.0 ($$(cat $(RELEASE_DIR)/build-number)); Apple processes it for a few minutes — make testflight"
+	@echo ">> uploaded $(VERSION) ($$(cat $(RELEASE_DIR)/build-number)); Apple processes it for a few minutes — make testflight"
 
 testflight: need-asc ## Show recent uploads and whether Apple has finished processing them
 	ASC_ENV="$(ASC_ENV)" tools/asc.py builds

@@ -13,7 +13,7 @@ import Testing
     }
 
     @Test func hasAVersionAndACategory() {
-        #expect(info["CFBundleShortVersionString"] as? String == "1.0")
+        #expect(info["CFBundleShortVersionString"] as? String == "1.1")
         #expect(info["LSApplicationCategoryType"] as? String == "public.app-category.card-games")
     }
 

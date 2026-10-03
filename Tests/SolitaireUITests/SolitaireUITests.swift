@@ -536,7 +536,7 @@ final class SolitaireUITests: XCTestCase {
         more(app, "About")
         // iOS exposes static text as its label, macOS as its value.
         let version = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
-                                                           "Version 1.0", "Version 1.0")).firstMatch
+                                                           "Version 1.1", "Version 1.1")).firstMatch
         XCTAssertTrue(version.waitForExistence(timeout: 5), "the version line")
         for link in ["One Off Endeavors", "Privacy policy", "Support and feedback"] {
             XCTAssertTrue(app.descendants(matching: .any)[link].firstMatch.exists, link)

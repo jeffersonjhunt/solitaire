@@ -11,7 +11,8 @@
 #   tools/check-release.sh --app <Solitaire.app> <ios|macos> <build>   one app bundle
 set -uo pipefail
 TEAM=${TEAM:-$(cat "$(dirname "$0")/../.devteam" 2>/dev/null)}
-VERSION=1.0
+# The version is project.yml's MARKETING_VERSION — one place to change it.
+VERSION=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"/\1/p' "$(dirname "$0")/../project.yml")
 fail=0
 ok()  { echo "  ✓ $*"; }
 bad() { echo "  ✗ $*"; fail=1; }
