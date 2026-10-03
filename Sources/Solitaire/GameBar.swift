@@ -68,7 +68,7 @@ struct GameHeader: View {
     /// (asked first when a game is in progress). The capsule is 28 pt tall; its tap target reaches
     /// 8 pt beyond it above and below (44 pt) without making the header any taller.
     private var drawChip: some View {
-        let chip = Self.drawChip(current: store.state.drawCount)
+        let chip = Self.drawChip(current: store.state.drawCount, hardCore: store.state.isHardCore)
         return Button { ui.requestNewGame(drawCount: chip.other, store: store) } label: {
             HStack(spacing: 6) {
                 Text(chip.text)
@@ -104,11 +104,14 @@ struct GameHeader: View {
         }
     }
 
-    /// The chip for this game's draw mode, and the mode it switches to.
-    nonisolated static func drawChip(current: Int) -> (text: String, spoken: String, hint: String, other: Int) {
+    /// The chip for this game's draw mode (and Hard Core), and the mode it switches to.
+    nonisolated static func drawChip(current: Int, hardCore: Bool = false)
+        -> (text: String, spoken: String, hint: String, other: Int) {
         let other = current == 3 ? 1 : 3
         let word = { $0 == 3 ? "three" : "one" }
-        return ("DRAW \(current)", "Draw \(word(current))", "Switches to Draw \(other) and starts a new game", other)
+        return (hardCore ? "DRAW \(current) · HC" : "DRAW \(current)",
+                hardCore ? "Draw \(word(current)), Hard Core" : "Draw \(word(current))",
+                "Switches to Draw \(other) and starts a new game", other)
     }
 
     static func clock(_ elapsed: TimeInterval) -> String {

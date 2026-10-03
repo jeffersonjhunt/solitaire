@@ -21,6 +21,7 @@ private func tempSaveURL() -> URL {
     @Test(arguments: [
         "won", "3 foundations", "8 columns", "51 cards", "duplicate card", "rank 14", "draw 2",
         "negative moves", "negative time", "negative redeals", "more redeals than moves",
+        "hard core past its passes",
         "face-down column top", "face-up stock", "face-down waste", "foundation out of order",
         "mixed foundation", "unbuilt run",
     ])
@@ -38,6 +39,7 @@ private func tempSaveURL() -> URL {
         case "negative time": s.elapsed = -1
         case "negative redeals": s.redeals = -1
         case "more redeals than moves": s.moveCount = 3; s.redeals = 4
+        case "hard core past its passes": s.isHardCore = true; s.drawCount = 1; s.moveCount = 30; s.redeals = 1
         case "face-down column top": s.tableau[6][6].isFaceUp = false
         case "face-up stock": s.stock[0].isFaceUp = true
         case "face-down waste":
@@ -154,9 +156,12 @@ private func board(_ defect: String) -> GameState {
         #expect(LaunchPlan.decide(saved: saved, resumePreferred: true, drawCount: 1) == .resume(saved))
     }
 
-    @Test func dealFreshOtherwiseInTheRememberedMode() {
+    @MainActor @Test func dealFreshOtherwiseInTheRememberedMode() {
         #expect(LaunchPlan.decide(saved: saved, resumePreferred: false, drawCount: 3) == .deal(drawCount: 3))
         #expect(LaunchPlan.decide(saved: nil, resumePreferred: true, drawCount: 3) == .deal(drawCount: 3))
+        #expect(LaunchPlan.decide(saved: nil, resumePreferred: true, drawCount: 3, hardCore: true)
+                == .deal(drawCount: 3, hardCore: true), "a fresh launch deals Hard Core if the last deal was")
+        #expect(GameStore.launch(.deal(drawCount: 1, hardCore: true), drawCount: 1, saver: nil).state.isHardCore)
         #expect(LaunchPlan.decide(saved: nil, resumePreferred: true, drawCount: 7) == .deal(drawCount: 1),
                 "a corrupt setting is clamped")
     }

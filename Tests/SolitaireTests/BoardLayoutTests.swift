@@ -95,6 +95,8 @@ func worstCaseState() -> GameState {
     @Test func drawChipShowsThisGamesModeAndOffersTheOther() {
         #expect(GameHeader.drawChip(current: 1) == ("DRAW 1", "Draw one", "Switches to Draw 3 and starts a new game", 3))
         #expect(GameHeader.drawChip(current: 3) == ("DRAW 3", "Draw three", "Switches to Draw 1 and starts a new game", 1))
+        #expect(GameHeader.drawChip(current: 1, hardCore: true).text == "DRAW 1 · HC")
+        #expect(GameHeader.drawChip(current: 1, hardCore: true).spoken == "Draw one, Hard Core")
     }
 
     /// A touch board held sideways caps that space at 16 pt — height is what limits its cards.

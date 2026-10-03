@@ -44,7 +44,7 @@ struct SolitaireApp: App {
         .defaultSize(width: 520, height: 640)
 
         Settings {
-            SettingsView()
+            SettingsView(store: store, ui: ui)
                 .frame(width: 440, height: 600)
         }
 
@@ -74,6 +74,7 @@ struct SolitaireApp: App {
         store = launchFromSave(url: url, saver: saver)
         #endif
         store.rememberDrawCount = { AppSettings.defaults.set($0, forKey: AppSettings.drawCountKey) }
+        store.rememberHardCore = { AppSettings.defaults.set($0, forKey: AppSettings.hardCoreKey) }
         saveBeforeTheProcessMayEnd(store)
         return store
     }
@@ -82,8 +83,9 @@ struct SolitaireApp: App {
         let defaults = AppSettings.defaults
         let drawCount = defaults.object(forKey: AppSettings.drawCountKey) as? Int ?? 1
         let resume = defaults.object(forKey: AppSettings.resumeKey) as? Bool ?? true
+        let hardCore = defaults.object(forKey: AppSettings.hardCoreKey) as? Bool ?? false
         let plan = LaunchPlan.decide(saved: url.flatMap(GameSaver.load(from:)), resumePreferred: resume,
-                                     drawCount: drawCount)
+                                     drawCount: drawCount, hardCore: hardCore)
         return GameStore.launch(plan, drawCount: drawCount, saver: saver)
     }
 
@@ -108,6 +110,8 @@ struct SolitaireApp: App {
 /// suite, so a test choosing Draw 3 never changes the player's real preference.
 enum AppSettings {
     static let drawCountKey = "drawCount"
+    /// Whether the last deal was Hard Core (spec "Hard Core"); the next fresh deal follows it.
+    static let hardCoreKey = "hardCore"
     static let resumeKey = "resumeOnLaunch"
     /// The card face and back (spec "Card styles"); an unknown stored value reads as the default.
     static let cardFaceKey = "cardFace"

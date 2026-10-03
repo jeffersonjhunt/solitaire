@@ -257,6 +257,38 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw three")
     }
 
+    /// Hard Core (spec "Hard Core"): the Settings switch deals a Hard Core game at once on a fresh
+    /// deal; Draw 1 then gets one pass — the empty stock shows ✕ and doesn't redeal; turning it off
+    /// mid-game asks, and Cancel keeps the Hard Core game.
+    func testHardCore() {
+        let app = launch()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Settings")
+        let toggle = settingsSwitch(app, "Hard Core")
+        XCTAssertNotNil(toggle)
+        toggle?.press()
+        XCTAssertTrue(app.descendants(matching: .any)["moreCard"].waitForNonExistence(timeout: 2))
+        let chip = app.descendants(matching: .any)["drawChip"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        XCTAssertNil(confirmation(app, timeout: 1), "a fresh deal: no question")
+        XCTAssertEqual(chip.label, "Draw one, Hard Core", "Settings closed and a Hard Core game was dealt")
+        for _ in 0..<24 {
+            app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Stock'")).firstMatch.press()
+        }
+        let out = app.descendants(matching: .any)["Stock, empty. No passes left"]
+        XCTAssertTrue(out.waitForExistence(timeout: 5), "one pass in Draw 1: no redeal")
+        out.press()
+        XCTAssertTrue(out.exists, "tapping it does nothing")
+        more(app, "Settings")
+        settingsSwitch(app, "Hard Core")?.press()
+        let ask = confirmation(app)
+        XCTAssertNotNil(ask, "mid-game, turning it off asks")
+        XCTAssertTrue(ask?.staticTexts["Turn off Hard Core?"].exists ?? false)
+        ask?.buttons["Cancel"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["confirmation"].waitForNonExistence(timeout: 3))
+        XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw one, Hard Core", "Cancel keeps it")
+    }
+
     /// The draw chip switches mode by dealing: at once on a fresh deal, asked first mid-game; the
     /// mode survives a relaunch. Random deals (no seed): a seeded launch always builds a fresh
     /// Draw 1 game and ignores the save, so it could never show the mode being remembered.

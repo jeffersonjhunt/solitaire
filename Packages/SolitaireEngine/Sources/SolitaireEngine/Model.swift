@@ -56,12 +56,18 @@ public struct GameState: Codable, Sendable, Equatable {
     /// Times the waste has been turned back over into the stock.
     public var redeals: Int
 
+    /// Hard Core: passes through the deck are limited (`maxPasses`).
+    public var isHardCore: Bool
+
     /// Trips through the deck: the first is pass 1, and each redeal starts another.
     public var passes: Int { redeals + 1 }
 
+    /// Hard Core's limit — one pass in Draw 1, three in Draw 3; nil (unlimited) otherwise.
+    public var maxPasses: Int? { isHardCore ? (drawCount == 3 ? 3 : 1) : nil }
+
     public init(stock: [Card], waste: [Card], foundations: [[Card]], tableau: [[Card]],
                 drawCount: Int, moveCount: Int = 0, elapsed: TimeInterval = 0,
-                isWon: Bool = false, seed: UInt64 = 0, redeals: Int = 0) {
+                isWon: Bool = false, seed: UInt64 = 0, redeals: Int = 0, isHardCore: Bool = false) {
         self.stock = stock
         self.waste = waste
         self.foundations = foundations
@@ -72,10 +78,11 @@ public struct GameState: Codable, Sendable, Equatable {
         self.isWon = isWon
         self.seed = seed
         self.redeals = redeals
+        self.isHardCore = isHardCore
     }
 
     /// Decodes a saved game. Saves from before passes were counted have no `redeals` and resume
-    /// with none.
+    /// with none; saves from before Hard Core are normal games.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         stock = try c.decode([Card].self, forKey: .stock)
@@ -88,6 +95,7 @@ public struct GameState: Codable, Sendable, Equatable {
         isWon = try c.decode(Bool.self, forKey: .isWon)
         seed = try c.decode(UInt64.self, forKey: .seed)
         redeals = try c.decodeIfPresent(Int.self, forKey: .redeals) ?? 0
+        isHardCore = try c.decodeIfPresent(Bool.self, forKey: .isHardCore) ?? false
     }
 
     /// The cards of any pile, bottom to top.

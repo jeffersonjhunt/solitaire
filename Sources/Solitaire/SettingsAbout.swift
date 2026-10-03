@@ -5,6 +5,8 @@ import SwiftUI
 /// and the card face and back, with a live preview. (The draw mode is the draw chip's, not a setting.) A sheet on iPhone and iPad, the Settings window (⌘,) on the Mac.
 /// Every change is saved and applied at once, the game in progress included.
 struct SettingsView: View {
+    let store: GameStore
+    let ui: AppUI
     @AppStorage(AppSettings.resumeKey, store: AppSettings.defaults) private var resumeOnLaunch = true
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var face = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var back = CardBackStyle.classicBlue
@@ -38,6 +40,22 @@ struct SettingsView: View {
                 Toggle("Resume game at launch", isOn: $resumeOnLaunch)
                     .accessibilityLabel("Resume game at launch")
                     .tint(TableColors.accent)
+                // Shows the current game's mode; changing it deals a new game (spec "Hard Core").
+                // Settings closes first, so the question (if any) shows over the game.
+                Toggle(isOn: Binding(get: { store.state.isHardCore }, set: { on in
+                    closeSettings()
+                    ui.requestNewGame(hardCore: on, store: store)
+                })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Hard Core")
+                        Text("Draw 1: one pass through the deck. Draw 3: three. Changing it starts a new game.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityLabel("Hard Core")
+                .accessibilityHint("Limits passes through the deck. Changing it starts a new game")
+                .tint(TableColors.accent)
                 Toggle("Draw pile on the right", isOn: Binding(
                     get: { drawPileSide == .right },
                     set: { drawPileSide = $0 ? .right : .left }))
@@ -66,6 +84,17 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+extension SettingsView {
+    /// Closes Settings: the sheet on iPhone and iPad, the window on the Mac.
+    func closeSettings() {
+        #if os(macOS)
+        NSApp.keyWindow?.close()
+        #else
+        ui.showingSettings = false
+        #endif
     }
 }
 

@@ -7,8 +7,8 @@ public enum SolitaireEngine {
     // MARK: Deal
 
     /// A fresh deal: column i gets i+1 cards with only its last card face up; the other 24 cards
-    /// form the stock, face down.
-    public static func newGame(drawCount: Int, seed: UInt64) -> GameState {
+    /// form the stock, face down. `hardCore`: passes through the deck are limited.
+    public static func newGame(drawCount: Int, seed: UInt64, hardCore: Bool = false) -> GameState {
         precondition(drawCount == 1 || drawCount == 3, "drawCount must be 1 or 3")
         var deck = Suit.allCases.flatMap { suit in (1...13).map { Card(suit: suit, rank: $0) } }
         var rng = SplitMix64(seed: seed)
@@ -22,7 +22,7 @@ public enum SolitaireEngine {
             tableau[column][column].isFaceUp = true
         }
         return GameState(stock: deck, waste: [], foundations: Array(repeating: [], count: 4),
-                         tableau: tableau, drawCount: drawCount, seed: seed)
+                         tableau: tableau, drawCount: drawCount, seed: seed, isHardCore: hardCore)
     }
 
     // MARK: Moves
@@ -69,10 +69,22 @@ public enum SolitaireEngine {
     /// Tapping the stock: draw `drawCount` cards (fewer if the stock runs short) onto the waste,
     /// face up; with the stock empty, turn the waste back over into the stock. Either counts as
     /// one move. With both empty, or once the game is won, it does nothing.
+    /// The stock is empty, the waste is not, and a pass remains (Hard Core limits them).
+    public static func canRedeal(_ state: GameState) -> Bool {
+        guard !state.isWon, state.stock.isEmpty, !state.waste.isEmpty else { return false }
+        return state.maxPasses.map { state.passes < $0 } ?? true
+    }
+
+    /// Hard Core with its passes used up: the stock is empty, the waste is not, and no redeal is
+    /// left (the stock shows ✕).
+    public static func isOutOfPasses(_ state: GameState) -> Bool {
+        !state.isWon && state.stock.isEmpty && !state.waste.isEmpty && !canRedeal(state)
+    }
+
     public static func drawFromStock(_ state: inout GameState) {
         guard !state.isWon else { return }
         if state.stock.isEmpty {
-            guard !state.waste.isEmpty else { return }
+            guard canRedeal(state) else { return }               // nothing to turn over, or no pass left
             state.stock = state.waste.reversed().map { card in
                 var c = card
                 c.isFaceUp = false

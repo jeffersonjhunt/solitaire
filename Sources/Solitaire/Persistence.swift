@@ -64,7 +64,8 @@ enum SaveValidation {
               s.drawCount == 1 || s.drawCount == 3,
               !s.isWon, !SolitaireEngine.isWon(s),
               s.moveCount >= 0, s.elapsed >= 0, s.elapsed.isFinite,
-              (0...s.moveCount).contains(s.redeals)             // each redeal is itself a move
+              (0...s.moveCount).contains(s.redeals),            // each redeal is itself a move
+              s.passes <= s.maxPasses ?? .max                   // Hard Core: within its limit
         else { return false }
         let cards = s.stock + s.waste + s.foundations.flatMap { $0 } + s.tableau.flatMap { $0 }
         guard cards.count == 52, cards.allSatisfy({ (1...13).contains($0.rank) }),
@@ -92,11 +93,12 @@ enum SaveValidation {
 /// deal a fresh one in the remembered draw mode.
 enum LaunchPlan: Equatable {
     case resume(GameState)
-    case deal(drawCount: Int)
+    case deal(drawCount: Int, hardCore: Bool = false)
 
-    static func decide(saved: GameState?, resumePreferred: Bool, drawCount: Int) -> LaunchPlan {
+    static func decide(saved: GameState?, resumePreferred: Bool, drawCount: Int,
+                       hardCore: Bool = false) -> LaunchPlan {
         if resumePreferred, let saved { return .resume(saved) }
-        return .deal(drawCount: GameStore.validDrawCount(drawCount))
+        return .deal(drawCount: GameStore.validDrawCount(drawCount), hardCore: hardCore)
     }
 }
 

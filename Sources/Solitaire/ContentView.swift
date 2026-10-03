@@ -60,7 +60,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: Binding(get: { ui.showingSettings }, set: { ui.showingSettings = $0 })) {
             NavigationStack {
-                SettingsView()
+                SettingsView(store: store, ui: ui)
                     .navigationTitle("Settings")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -86,13 +86,14 @@ struct ContentView: View {
                 DialogScrim(outside: { ui.pendingNewGame = nil }) {
                     QuestionCard(request: request, cancel: { ui.pendingNewGame = nil }) {
                         ui.pendingNewGame = nil
-                        store.newGame(drawCount: request.drawCount)
+                        store.newGame(drawCount: request.drawCount, hardCore: request.hardCore)
                     }
                 }
                 .transition(.opacity)
             } else if winSheetShown.wrappedValue {
                 DialogScrim(bottom: !wideDialogs, maxWidth: 480) {
-                    WinCard(drawCount: store.state.drawCount, moves: store.state.moveCount,
+                    WinCard(drawCount: store.state.drawCount, hardCore: store.state.isHardCore,
+                            moves: store.state.moveCount,
                             elapsed: store.state.elapsed, passes: store.state.passes, wide: wideDialogs,
                             newGame: { store.newGame(drawCount: $0) },
                             close: { dismissedWinSeed = store.state.seed })
