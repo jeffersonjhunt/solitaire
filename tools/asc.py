@@ -3,6 +3,8 @@
 
     tools/asc.py builds                  recent uploads: version, build, platform, processing state
     tools/asc.py bundle-id [--create]    look up (or register) the app's bundle ID
+    tools/asc.py whats-new <build> <file>   the "What to Test" notes testers see for that build (all
+                                         its platforms), from a text file
     tools/asc.py gamecenter [--create]   Game Center and iCloud for the app: the bundle ID's
                                          capabilities, the four leaderboards and their set (spec
                                          "Scores"); --create adds whatever is missing, and only that
@@ -209,12 +211,38 @@ def gamecenter(create):
                  f"{len(missing)} leaderboards added to the set")
 
 
+def whats_new(build_number, path):
+    """Sets the English "What to Test" text on every platform's upload of a build."""
+    text = open(path).read().strip()
+    if not text or len(text) > 4000:
+        sys.exit(f"the notes must be 1-4000 characters (they are {len(text)})")
+    app = get("/v1/apps?filter[bundleId]=" + urllib.parse.quote(BUNDLE_ID))["data"][0]["id"]
+    builds = get(f"/v1/builds?filter[app]={app}&filter[version]={urllib.parse.quote(build_number)}&limit=10")["data"]
+    if not builds:
+        sys.exit(f"no build {build_number} yet (an upload takes a few minutes to appear)")
+    for b in builds:
+        locs = get(f"/v1/builds/{b['id']}/betaBuildLocalizations")["data"]
+        mine = next((l for l in locs if l["attributes"]["locale"] == "en-US"), None)
+        if mine:
+            status, data = call("PATCH", f"/v1/betaBuildLocalizations/{mine['id']}", {"data": {
+                "type": "betaBuildLocalizations", "id": mine["id"], "attributes": {"whatsNew": text}}})
+        else:
+            status, data = call("POST", "/v1/betaBuildLocalizations", {"data": {
+                "type": "betaBuildLocalizations", "attributes": {"locale": "en-US", "whatsNew": text},
+                "relationships": {"build": {"data": {"type": "builds", "id": b["id"]}}}}})
+        if status not in (200, 201):
+            sys.exit(f"could not set the notes on build {b['id']}: {status} {json.dumps(data.get('errors', data))[:400]}")
+        print(f"  notes set on {build_number} ({b['id']})")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "builds"
     if cmd == "builds":
         builds()
     elif cmd == "bundle-id":
         bundle_id("--create" in sys.argv)
+    elif cmd == "whats-new" and len(sys.argv) == 4:
+        whats_new(sys.argv[2], sys.argv[3])
     elif cmd == "gamecenter":
         gamecenter("--create" in sys.argv)
     else:
