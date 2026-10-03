@@ -54,6 +54,22 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(card.descendants(matching: .any)["0 undos"].exists, "undos on the win card")
         XCTAssertTrue(card.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Score '")).firstMatch.exists,
                       "the score on the win card")
+        // The first win of a fresh Top 10 is #1 (spec "Scores"); Top 10 opens Scores on that mode.
+        XCTAssertTrue(card.descendants(matching: .any)["topTenBadge"].exists, "the New Top 10 badge")
+        // Text is a label on iPhone and a value on the Mac: read whichever is set.
+        let badge = card.descendants(matching: .any)["topTenBadge"]
+        XCTAssertEqual(badge.label.isEmpty ? "\(badge.value ?? "")" : badge.label, "New Top 10 · #1 in Draw 1")
+        card.buttons["Top 10"].press()
+        let scores = app.descendants(matching: .any)["scores"]
+        XCTAssertTrue(scores.waitForExistence(timeout: 5), "Scores")
+        XCTAssertTrue(scores.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH '1. '")).firstMatch.exists,
+                      "the win in the Top 10")
+        #if os(macOS)
+        app.typeKey("w", modifierFlags: .command)                         // the Scores window
+        #else
+        scores.buttons["Done"].press()
+        #endif
+        XCTAssertTrue(scores.waitForNonExistence(timeout: 5))
         card.buttons["Close"].press()
         XCTAssertTrue(app.staticTexts["You won!"].waitForNonExistence(timeout: 5), "Close dismisses it")
     }
@@ -290,6 +306,19 @@ final class SolitaireUITests: XCTestCase {
         ask?.buttons["Cancel"].press()
         XCTAssertTrue(app.descendants(matching: .any)["confirmation"].waitForNonExistence(timeout: 3))
         XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw one, Hard Core", "Cancel keeps it")
+    }
+
+    /// Scores from More, before any win: an empty Top 10 says so.
+    func testScoresStartEmpty() {
+        let app = launch(seed: 4)
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
+        more(app, "Scores")
+        let scores = app.descendants(matching: .any)["scores"]
+        XCTAssertTrue(scores.waitForExistence(timeout: 5))
+        XCTAssertTrue(scores.staticTexts["No wins yet in Draw 1."].exists)
+        // Separate text on iPhone; part of the board row's label on the Mac.
+        XCTAssertTrue(scores.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Not signed in'")).firstMatch.exists,
+                      "Game Center is off under tests")
     }
 
     /// The header leads with the score (spec "Scoring"): 600 on a fresh deal.
@@ -559,7 +588,7 @@ final class SolitaireUITests: XCTestCase {
         let card = app.descendants(matching: .any)["moreCard"]
         app.buttons["More"].firstMatch.press()
         XCTAssertTrue(card.waitForExistence(timeout: 5))
-        for tile in ["How to Play", "Settings", "About"] {
+        for tile in ["How to Play", "Scores", "Settings", "About"] {
             XCTAssertTrue(card.buttons[tile].exists, tile)
         }
         card.buttons["Close"].press()

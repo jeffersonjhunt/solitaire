@@ -1,13 +1,29 @@
+import SolitaireEngine
 import SwiftUI
 
 @main
 struct SolitaireApp: App {
-    @State private var store = SolitaireApp.makeStore()
+    @State private var store: GameStore
     @State private var ui = AppUI()
+    @State private var scores: ScoreBook
+    @State private var gameCenter: GameCenter
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
         AppFont.register()
+        let store = SolitaireApp.makeStore()
+        let scores = ScoreBook(local: AppSettings.defaults,
+                               cloud: AppSettings.usesOutsideServices ? .default : nil)
+        let gameCenter = GameCenter(enabled: AppSettings.usesOutsideServices)
+        // Every win goes into the Top 10 and to its Game Center board (spec "Scores").
+        store.onWin = { state in
+            scores.record(state)
+            gameCenter.submit(score: SolitaireEngine.score(state), drawCount: state.drawCount,
+                              hardCore: state.isHardCore)
+        }
+        _store = State(initialValue: store)
+        _scores = State(initialValue: scores)
+        _gameCenter = State(initialValue: gameCenter)
     }
 
     /// The smallest Mac window: tall enough that, under the header and the bottom bar, cards stay
@@ -16,7 +32,7 @@ struct SolitaireApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store, ui: ui)
+            ContentView(store: store, ui: ui, scores: scores, gameCenter: gameCenter)
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     store.isActive = phase == .active
                     if phase != .active { store.saveNow() }          // leaving the foreground
@@ -47,6 +63,12 @@ struct SolitaireApp: App {
             SettingsView(store: store, ui: ui)
                 .frame(width: 440, height: 600)
         }
+
+        Window("Scores", id: ScoresWindow.id) {
+            ScoresView(scores: scores, gameCenter: gameCenter, drawCount: store.state.drawCount)
+                .frame(width: 420, height: 660)
+        }
+        .windowResizability(.contentSize)
 
         Window("About Solitaire", id: AboutCommands.windowID) {
             AboutView()
@@ -128,6 +150,14 @@ enum AppSettings {
         defaults.object(forKey: askBeforeEndingGameKey) as? Bool ?? true
     }
 
+    /// iCloud and Game Center are used by the app itself, never under tests (unit-test host or
+    /// UI tests, which run with their own settings suite): tests must not touch the player's Top
+    /// 10 or post scores (spec "Scores").
+    static var usesOutsideServices: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["XCTestConfigurationFilePath"] == nil && env["SOLITAIRE_DEFAULTS_SUITE"] == nil
+    }
+
     static var defaults: UserDefaults {
         #if DEBUG
         if let suite = ProcessInfo.processInfo.environment["SOLITAIRE_DEFAULTS_SUITE"],
@@ -187,9 +217,10 @@ struct GameCommands: Commands {
 @Observable @MainActor
 final class AppUI {
     var showingHelp = false
-    /// Settings and About as sheets on iPhone and iPad (the Mac uses its own windows).
+    /// Settings, About and Scores as sheets on iPhone and iPad (the Mac uses its own windows).
     var showingSettings = false
     var showingAbout = false
+    var showingScores = false
     /// A new deal waiting for the player to confirm losing the game in progress.
     var pendingNewGame: NewGameRequest?
     /// Whether to ask before a new deal replaces a game in progress (the Settings switch; tests
@@ -240,3 +271,8 @@ struct AboutCommands: Commands {
     }
 }
 #endif
+
+/// The Mac's Scores window.
+enum ScoresWindow {
+    static let id = "scores"
+}

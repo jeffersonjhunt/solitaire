@@ -179,7 +179,8 @@ Decided from the 1.1 mockups (design canvas, "1.1 — every dialog and screen").
   VoiceOver treats the card as modal and starts at its title. Tapping the dimmed table outside a
   question cancels it; outside the win card it does nothing.
 - **Win card:** the draw mode as a small label, "You won!", SCORE large in Space Mono, then the
-  figures MOVES, TIME, PASSES and UNDOS, then **New Game · Draw n** in
+  figures MOVES, TIME, PASSES and UNDOS, a "New Top 10" badge when the win made the list (see
+  "Scores"), and the buttons — with **Top 10** beside the other mode, then **New Game · Draw n** in
   the same mode (orange), **Draw m instead**, and **Close**. On iPhone it sits at the bottom of
   the screen; on iPad, the Mac and a phone held sideways it is centred, at most 480 pt wide, with
   its buttons in one row — Close and the other mode at their labels' width, the main button taking
@@ -248,6 +249,34 @@ others. The score is live: **SCORE** leads the header (SCORE, TIME, MOVES and th
 every size) and ticks down with the clock; VoiceOver reads "Score 754". The win card shows it
 large over MOVES, TIME, PASSES and UNDOS. A game saved before undos were counted resumes with none.
 
+## Scores: your Top 10 and Game Center
+
+Only **wins** count. Each win is recorded twice:
+
+- **Your Top 10** — two lists, **Draw 1** and **Draw 3**, each the ten best wins in that mode
+  (normal and Hard Core together, Hard Core marked **HC**), with score, time and date; the higher
+  score first, and on a tie the earlier win. Kept on the device and synced across the player's
+  devices through iCloud's key-value store (merged, never overwritten: the best ten of both
+  copies); without iCloud the lists stay on the device.
+- **Game Center** — four leaderboards, one per draw mode and difficulty, in one set "Solitaire":
+  `com.oneoffendeavors.solitaire.draw1`, `.draw3`, `.draw1.hardcore`, `.draw3.hardcore` (integer
+  scores 0–1000, each player's best kept, highest first; created by `tools/asc.py gamecenter`).
+  The player is signed in at launch through Game Center's own prompt; signed out, nothing is
+  submitted and the game is unaffected. Prerelease builds (TestFlight) use the same Game Center as
+  the store: their scores are visible to the player's Game Center friends.
+
+**Scores** (a tile on the More card; a sheet on iPhone and iPad, its own window on the Mac) is a
+dark screen: a **Draw 1 / Draw 3** switch (opening on the current game's mode), **Your Top 10**
+for that mode (the latest win highlighted; "No wins yet" when empty), then that mode's two Game
+Center boards with the player's best and rank ("Not signed in" or "No score yet" otherwise) —
+each opens the board in Game Center — and a footnote on iCloud.
+
+**The win card** shows a **New Top 10 · #3 in Draw 1** badge (orange outline) when the win made the
+list, and a **Top 10** button that opens Scores on that mode.
+
+Tests never touch the player's Top 10, iCloud or Game Center: UI tests use their own settings
+suite with iCloud and Game Center off.
+
 ## Hard Core
 
 A harder game with limited passes through the deck: **one in Draw 1** (no redeal at all) and
@@ -269,9 +298,8 @@ game (a save without it is a normal game).
 ## Settings, About and the More menu
 
 **More** (the fourth button of the bottom bar) opens a dark card of tiles on every platform (spec
-"Colours and dialogs"; option B of the 1.1 mockups): **How to Play**, **Settings** and **About**,
-each an orange icon over its label on a #1E1E1E tile, with Close below (Scores joins in 1.1's
-Top 10 unit). On a phone held upright the card rises from the bottom; elsewhere it is centred.
+"Colours and dialogs"; option B of the 1.1 mockups): **How to Play**, **Scores**, **Settings** and
+**About**, each an orange icon over its label on a #1E1E1E tile, with Close below. On a phone held upright the card rises from the bottom; elsewhere it is centred.
 Choosing a tile closes the card and opens that screen; Close, Esc or a tap on the dimmed table
 just closes it. On
 the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ About Solitaire opens About.

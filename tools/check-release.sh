@@ -3,7 +3,9 @@
 # the spec would otherwise catch late, or not at all:
 #   signed "Apple Distribution" by the team; no debugger entitlement (iOS: get-task-allow false,
 #   Mac: com.apple.security.get-task-allow absent — spec decision 2026-09-27); Mac sandboxed;
-#   the privacy manifest inside; the version and build number that were archived.
+#   Game Center and iCloud's key-value store entitled on both (spec "Scores": without them the
+#   build still uploads, but sign-in and Top 10 sync silently fail); the privacy manifest inside;
+#   the version and build number that were archived.
 #
 #   tools/check-release.sh <release-dir>                          both exported packages
 #   tools/check-release.sh --app <Solitaire.app> <ios|macos> <build>   one app bundle
@@ -28,6 +30,9 @@ check_app() {
   else
     if printf '%s' "$ents" | grep -q '"get-task-allow":true'; then bad "get-task-allow is true (debuggable)"; else ok "get-task-allow not true"; fi
   fi
+  if printf '%s' "$ents" | grep -q '"com.apple.developer.game-center":true'; then ok "Game Center entitled"; else bad "no Game Center entitlement"; fi
+  if printf '%s' "$ents" | grep -q "\"com.apple.developer.ubiquity-kvstore-identifier\":\"$TEAM.com.oneoffendeavors.solitaire\""; then
+    ok "iCloud key-value store entitled"; else bad "no iCloud key-value store entitlement for $TEAM.com.oneoffendeavors.solitaire"; fi
   [ -f "$res/PrivacyInfo.xcprivacy" ] && ok "privacy manifest present" || bad "no PrivacyInfo.xcprivacy"
   local v b; v=$(plutil -extract CFBundleShortVersionString raw "$info" 2>/dev/null); b=$(plutil -extract CFBundleVersion raw "$info" 2>/dev/null)
   [ "$v" = "$VERSION" ] && [ "$b" = "$build" ] && ok "version $v ($b)" || bad "version $v ($b), expected $VERSION ($build)"

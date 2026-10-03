@@ -157,7 +157,10 @@ struct WinCard: View {
     let elapsed: TimeInterval
     let passes: Int
     let undos: Int
+    /// The win's place in its mode's Top 10, if it made the list.
+    var topTenRank: Int?
     var wide = false
+    var showTopTen: () -> Void = {}
     let newGame: (Int) -> Void
     let close: () -> Void
     @AccessibilityFocusState private var titleFocused: Bool
@@ -189,6 +192,15 @@ struct WinCard: View {
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Score \(score)")
+            if let topTenRank {
+                Text("New Top 10 · #\(topTenRank) in Draw \(drawCount)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(DialogColors.orangeText)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .overlay(Capsule().strokeBorder(DialogColors.orangeText))
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("topTenBadge")
+            }
             HStack(spacing: 8) {
                 figure("MOVES", "\(moves)", spoken: "\(moves) moves")
                 figure("TIME", GameHeader.clock(elapsed), spoken: "Time \(GameHeader.spokenClock(elapsed))")
@@ -230,11 +242,17 @@ struct WinCard: View {
         let closeButton = Button("Close", action: close)
             .buttonStyle(DialogButtonStyle(kind: wide ? .outlined : .plain, height: 44, fills: !wide))
             .keyboardShortcut(.cancelAction)
+        let topTen = Button("Top 10", action: showTopTen)
+            .buttonStyle(DialogButtonStyle(kind: .outlined, height: wide ? 44 : 48, fills: !wide))
         Group {
             if wide {
-                HStack(spacing: 8) { closeButton; switchMode; same }
+                HStack(spacing: 8) { closeButton; topTen; switchMode; same }
             } else {
-                VStack(spacing: 10) { same; switchMode; closeButton }
+                VStack(spacing: 10) {
+                    same
+                    HStack(spacing: 10) { switchMode; topTen }
+                    closeButton
+                }
             }
         }
         .focusable(false)
@@ -242,10 +260,11 @@ struct WinCard: View {
 }
 
 /// More (spec "Settings, About and the More menu"): a dark card of tiles — icon over label, like
-/// the bar's buttons — that opens How to Play, Settings or About and closes itself. On a phone
+/// the bar's buttons — that opens How to Play, Scores, Settings or About and closes itself. On a phone
 /// held upright it rises from the bottom; elsewhere it is centred.
 struct MoreCard: View {
     let ui: AppUI
+    var showScores: () -> Void = {}
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
@@ -261,11 +280,11 @@ struct MoreCard: View {
             Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                 GridRow {
                     tile("How to Play", symbol: "questionmark.circle") { open(.help) }
-                    tile("Settings", symbol: "gearshape") { open(.settings) }
+                    tile("Scores", symbol: "trophy") { ui.showingMore = false; showScores() }
                 }
                 GridRow {
+                    tile("Settings", symbol: "gearshape") { open(.settings) }
                     tile("About", symbol: "info.circle") { open(.about) }
-                        .gridCellColumns(2)
                 }
             }
             Button("Close") { ui.showingMore = false }

@@ -3,6 +3,9 @@
 
     tools/asc.py builds                  recent uploads: version, build, platform, processing state
     tools/asc.py bundle-id [--create]    look up (or register) the app's bundle ID
+    tools/asc.py gamecenter [--create]   Game Center and iCloud for the app: the bundle ID's
+                                         capabilities, the four leaderboards and their set (spec
+                                         "Scores"); --create adds whatever is missing, and only that
 
 Credentials come from the api.env that `make` reads (ASC_ENV, default
 $HOME/.config/appstoreconnect/api.env): ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH. The ES256 token is
@@ -66,7 +69,8 @@ def call(method, path, body=None):
                                           "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
-            return r.status, json.load(r)
+            body = r.read()
+            return r.status, json.loads(body) if body else {}       # 204 No Content: no body
     except urllib.error.HTTPError as e:
         return e.code, json.load(e)
 
@@ -110,11 +114,108 @@ def bundle_id(create):
         print(f"{BUNDLE_ID} is not registered (pass --create)")
 
 
+# Spec "Scores": one board per draw mode and difficulty, each player's best kept, highest first.
+LEADERBOARDS = [
+    ("com.oneoffendeavors.solitaire.draw1", "Draw 1"),
+    ("com.oneoffendeavors.solitaire.draw3", "Draw 3"),
+    ("com.oneoffendeavors.solitaire.draw1.hardcore", "Draw 1 · Hard Core"),
+    ("com.oneoffendeavors.solitaire.draw3.hardcore", "Draw 3 · Hard Core"),
+]
+LEADERBOARD_SET = ("com.oneoffendeavors.solitaire.leaderboards", "Solitaire")
+CAPABILITIES = {
+    "GAME_CENTER": None,
+    "ICLOUD": [{"key": "ICLOUD_VERSION", "options": [{"key": "XCODE_6"}]}],
+}
+
+
+def post(path, body, what):
+    status, data = call("POST", path, body)
+    if status not in (200, 201, 204):
+        sys.exit(f"could not {what}: {status} {json.dumps(data.get('errors', data) if data else '')[:500]}")
+    print(f"  created: {what}")
+    return data
+
+
+def rel(kind, ident):
+    return {"data": {"type": kind, "id": ident}}
+
+
+def gamecenter(create):
+    """Reports, and with create adds, what Game Center and iCloud need. Never changes or removes
+    anything that exists."""
+    apps = get("/v1/apps?filter[bundleId]=" + urllib.parse.quote(BUNDLE_ID))["data"]
+    if not apps:
+        sys.exit(f"no App Store Connect app with bundle ID {BUNDLE_ID}")
+    app = apps[0]["id"]
+    bundle = get("/v1/bundleIds?filter[identifier]=" + urllib.parse.quote(BUNDLE_ID))["data"][0]["id"]
+
+    have = {c["attributes"]["capabilityType"]
+            for c in get(f"/v1/bundleIds/{bundle}/bundleIdCapabilities")["data"]}
+    for cap, settings in CAPABILITIES.items():
+        print(f"capability {cap}: {'on' if cap in have else 'missing'}")
+        if cap not in have and create:
+            attributes = {"capabilityType": cap}
+            if settings:
+                attributes["settings"] = settings
+            post("/v1/bundleIdCapabilities", {"data": {"type": "bundleIdCapabilities", "attributes": attributes,
+                 "relationships": {"bundleId": rel("bundleIds", bundle)}}}, f"capability {cap}")
+
+    status, detail = call("GET", f"/v1/apps/{app}/gameCenterDetail")
+    detail_id = detail["data"]["id"] if status == 200 and detail.get("data") else None
+    print(f"Game Center for the app: {'on' if detail_id else 'missing'}")
+    if not detail_id:
+        if not create:
+            return
+        detail_id = post("/v1/gameCenterDetails", {"data": {"type": "gameCenterDetails",
+                         "relationships": {"app": rel("apps", app)}}}, "Game Center detail")["data"]["id"]
+
+    boards = {b["attributes"]["vendorIdentifier"]: b["id"]
+              for b in get(f"/v1/gameCenterDetails/{detail_id}/gameCenterLeaderboards?limit=50")["data"]}
+    for vendor, name in LEADERBOARDS:
+        print(f"leaderboard {vendor}: {'present' if vendor in boards else 'missing'}")
+        if vendor in boards or not create:
+            continue
+        board = post("/v1/gameCenterLeaderboards", {"data": {"type": "gameCenterLeaderboards", "attributes": {
+            "referenceName": f"Solitaire — {name}", "vendorIdentifier": vendor, "defaultFormatter": "INTEGER",
+            "submissionType": "BEST_SCORE", "scoreSortType": "DESC", "scoreRangeStart": "0",
+            "scoreRangeEnd": "1000"}, "relationships": {"gameCenterDetail": rel("gameCenterDetails", detail_id)}}},
+            f"leaderboard {name}")["data"]["id"]
+        boards[vendor] = board
+        post("/v1/gameCenterLeaderboardLocalizations", {"data": {"type": "gameCenterLeaderboardLocalizations",
+             "attributes": {"locale": "en-US", "name": name, "formatterSuffix": " points",
+                            "formatterSuffixSingular": " point"},
+             "relationships": {"gameCenterLeaderboard": rel("gameCenterLeaderboards", board)}}},
+             f"English name for {name}")
+
+    sets = {s["attributes"]["vendorIdentifier"]: s["id"]
+            for s in get(f"/v1/gameCenterDetails/{detail_id}/gameCenterLeaderboardSets?limit=50")["data"]}
+    vendor, name = LEADERBOARD_SET
+    print(f"leaderboard set {vendor}: {'present' if vendor in sets else 'missing'}")
+    if vendor not in sets and create:
+        sets[vendor] = post("/v1/gameCenterLeaderboardSets", {"data": {"type": "gameCenterLeaderboardSets",
+            "attributes": {"referenceName": f"{name} leaderboards", "vendorIdentifier": vendor},
+            "relationships": {"gameCenterDetail": rel("gameCenterDetails", detail_id)}}}, "leaderboard set")["data"]["id"]
+        post("/v1/gameCenterLeaderboardSetLocalizations", {"data": {"type": "gameCenterLeaderboardSetLocalizations",
+             "attributes": {"locale": "en-US", "name": name},
+             "relationships": {"gameCenterLeaderboardSet": rel("gameCenterLeaderboardSets", sets[vendor])}}},
+             "English name for the set")
+    if vendor in sets:
+        members = {m["id"] for m in get(f"/v1/gameCenterLeaderboardSets/{sets[vendor]}/relationships/gameCenterLeaderboards?limit=50")["data"]}
+        missing = [boards[v] for v, _ in LEADERBOARDS if v in boards and boards[v] not in members]
+        print(f"  set members: {len(members)} of {len(LEADERBOARDS)}")
+        if missing and create:
+            post(f"/v1/gameCenterLeaderboardSets/{sets[vendor]}/relationships/gameCenterLeaderboards",
+                 {"data": [{"type": "gameCenterLeaderboards", "id": b} for b in missing]},
+                 f"{len(missing)} leaderboards added to the set")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "builds"
     if cmd == "builds":
         builds()
     elif cmd == "bundle-id":
         bundle_id("--create" in sys.argv)
+    elif cmd == "gamecenter":
+        gamecenter("--create" in sys.argv)
     else:
         sys.exit(__doc__)
