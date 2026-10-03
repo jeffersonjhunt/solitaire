@@ -443,8 +443,13 @@ enum GoldenDeal {
 // MARK: - Scoring (spec "Scoring")
 
 @Suite struct Scoring {
-    @Test func aFreshDealIsWorth600() {
-        #expect(E.score(E.newGame(drawCount: 1, seed: 3)) == 600)
+    @Test func aFreshDealIsWorthNothing() {
+        #expect(E.score(E.newGame(drawCount: 1, seed: 3)) == 0)
+    }
+
+    @Test(arguments: [(0, 600), (60, 600), (61, 599), (120, 540), (180, 420), (240, 240), (300, 0), (390, 0)])
+    func theTimeBonusIs600LessThePenalty(seconds: Int, bonus: Int) {
+        #expect(E.timeBonus(seconds: seconds) == bonus)
     }
 
     @Test(arguments: [(0, 0), (60, 0), (61, 1), (120, 60), (121, 62), (180, 180), (240, 360), (300, 600), (390, 1080)])
@@ -452,8 +457,9 @@ enum GoldenDeal {
         #expect(E.timePenalty(seconds: seconds) == penalty)
     }
 
-    /// The spec's table: a one-pass, no-undo win scores 1000 under a minute, then less with time.
-    @Test(arguments: [(59, 1000), (120, 940), (180, 820), (240, 640), (300, 400), (390, 0)])
+    /// The spec's table: a one-pass, no-undo win scores 1000 under a minute, then less with time,
+    /// down to the 400 its cards and suits earned.
+    @Test(arguments: [(59, 1000), (120, 940), (180, 820), (240, 640), (300, 400), (390, 400)])
     func aOnePassWin(seconds: Int, score: Int) {
         var s = E.newGame(drawCount: 1, seed: 3)
         s.foundations = Suit.allCases.map { suit in (1...13).map { Card(suit: suit, rank: $0, isFaceUp: true) } }
@@ -466,19 +472,35 @@ enum GoldenDeal {
         var s = E.newGame(drawCount: 1, seed: 3)
         s.foundations[0] = (1...13).map { Card(suit: .spades, rank: $0, isFaceUp: true) }   // a suit
         s.foundations[1] = [Card(suit: .hearts, rank: 1, isFaceUp: true)]                     // one more card
-        #expect(E.score(s) == 600 + 5 * 14 + 35)
+        #expect(E.score(s) == 5 * 14 + 35)
         s.undos = 2
-        #expect(E.score(s) == 600 + 70 + 35 - 6)
+        #expect(E.score(s) == 70 + 35 - 6)
+        s.elapsed = 600
+        #expect(E.score(s) == 70 + 35 - 6, "time only costs the win's bonus")
         s.redeals = 1
-        #expect(E.score(s) == 600 + 70 + 35 - 6 - 100)
+        #expect(E.score(s) == 0, "a redeal costs more than these cards earned")
+        s.foundations[2] = (1...13).map { Card(suit: .diamonds, rank: $0, isFaceUp: true) }   // another suit
+        #expect(E.score(s) == 5 * 27 + 70 - 6 - 100, "a redeal's cost is still owed after the floor")
         s.foundations[0].removeLast()                                                          // the king back off
-        #expect(E.score(s) == 600 + 65 - 6 - 100, "the card's 5 and the suit's 35 go")
+        #expect(E.score(s) == 5 * 26 + 35 - 6 - 100, "the card's 5 and the suit's 35 go")
     }
 
     @Test func neverBelowZero() {
         var s = E.newGame(drawCount: 3, seed: 3)
         s.redeals = 9
         #expect(E.score(s) == 0)
+    }
+
+    /// The bonus comes only with the win, and on top of everything the play earned.
+    @Test func theTimeBonusComesWithTheWin() {
+        var s = E.newGame(drawCount: 1, seed: 3)
+        s.foundations = Suit.allCases.map { suit in (1...13).map { Card(suit: suit, rank: $0, isFaceUp: true) } }
+        s.tableau = Array(repeating: [], count: 7); s.stock = []; s.waste = []
+        s.undos = 2; s.redeals = 1; s.elapsed = 200
+        #expect(E.playScore(s) == 400 - 6 - 100)
+        #expect(E.score(s) == 294 + 600 - E.timePenalty(seconds: 200))
+        s.foundations[3].removeLast()
+        #expect(!E.isWon(s) && E.score(s) == E.playScore(s), "no win, no bonus")
     }
 
     @Test func olderSavesHaveNoUndos() throws {

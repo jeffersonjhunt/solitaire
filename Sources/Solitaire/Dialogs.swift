@@ -153,6 +153,9 @@ struct WinCard: View {
     let drawCount: Int
     var hardCore = false
     let score: Int
+    /// The score's two parts: what the play earned and the time bonus (spec "Scoring").
+    var playScore = 0
+    var timeBonus = 0
     let moves: Int
     let elapsed: TimeInterval
     let passes: Int
@@ -188,10 +191,16 @@ struct WinCard: View {
                     .foregroundStyle(DialogColors.title)
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
+                Text("PLAY \(playScore) + TIME BONUS \(timeBonus)")
+                    .font(AppFont.mono(13, relativeTo: .footnote))
+                    .foregroundStyle(DialogColors.body)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Score \(score)")
+            .accessibilityValue("play \(playScore) plus time bonus \(timeBonus)")
             if let topTenRank {
                 Text("New Top 10 · #\(topTenRank) in Draw \(drawCount)")
                     .font(.subheadline.weight(.semibold))

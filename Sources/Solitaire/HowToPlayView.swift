@@ -76,8 +76,8 @@ enum HowToPlay {
                 "A face-down card uncovered at the bottom of a column turns over by itself.",
             ]),
             Section(title: "Scoring", lines: [
-                "Every game starts at **600**: **+5** for each card on a foundation and **+35** for each finished suit; **−3** for each undo and **−100** for each pass through the deck after the first.",
-                "Time costs too, after the first minute: 1 point a second in the second minute, 2 in the third, and so on. The score never goes below 0 — a one-pass win in under a minute scores **1000**.",
+                "Every game starts at **0**: **+5** for each card on a foundation and **+35** for each finished suit; **−3** for each undo and **−100** for each pass through the deck after the first. The score never goes below 0.",
+                "Win, and a **time bonus** is added: **600**, less 1 point a second in the second minute, 2 in the third, and so on — gone by 5:00. A one-pass win in under a minute scores **1000**.",
             ]),
             Section(title: "Hard Core", lines: [
                 "A harder game: **one pass** through the deck in Draw 1, **three** in Draw 3. When they're used up the stock shows ✕. Turn it on in **Settings** — changing it starts a new game.",
@@ -89,7 +89,7 @@ enum HowToPlay {
             Section(title: "Controls", lines: controls),
             Section(title: "Winning", lines: [
                 "When the stock and waste are empty and every card is face up, **Auto-finish** appears and plays the rest.",
-                "There is no score and no losing: if you are stuck, undo or deal again. Once you win, the game is locked.",
+                "There is no losing: if you are stuck, undo or deal again. Once you win, the game is locked.",
             ]),
             Section(title: "Saving", lines: [
                 "Your game is saved as you play and resumes at the next launch (undo starts fresh). \(resumeSetting)",

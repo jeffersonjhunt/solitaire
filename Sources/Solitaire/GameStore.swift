@@ -86,8 +86,10 @@ final class GameStore {
     /// Nothing undoes a win: a won game cannot be un-won (spec decision).
     var canUndo: Bool { !undoStack.isEmpty && !state.isWon }
     var canAutoFinish: Bool { SolitaireEngine.canAutoFinish(state) }
-    /// The live score (spec "Scoring").
+    /// The live score (spec "Scoring"): the play score, and the time bonus once won.
     var score: Int { SolitaireEngine.score(state) }
+    var playScore: Int { SolitaireEngine.playScore(state) }
+    var timeBonus: Int { state.isWon ? SolitaireEngine.timeBonus(seconds: Int(state.elapsed)) : 0 }
     /// A game the player would lose by dealing again: a move (a draw included) made, and not won.
     /// Only such a game is asked about before a new deal replaces it.
     var isInProgress: Bool { state.moveCount > 0 && !state.isWon }

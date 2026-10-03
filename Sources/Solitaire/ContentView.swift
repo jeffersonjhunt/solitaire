@@ -106,7 +106,8 @@ struct ContentView: View {
             } else if winSheetShown.wrappedValue {
                 DialogScrim(bottom: !wideDialogs, maxWidth: 480) {
                     WinCard(drawCount: store.state.drawCount, hardCore: store.state.isHardCore,
-                            score: store.score, moves: store.state.moveCount,
+                            score: store.score, playScore: store.playScore, timeBonus: store.timeBonus,
+                            moves: store.state.moveCount,
                             elapsed: store.state.elapsed, passes: store.state.passes,
                             undos: store.state.undos, topTenRank: scores.rank(ofWin: store.state),
                             wide: wideDialogs, showTopTen: showScores,
