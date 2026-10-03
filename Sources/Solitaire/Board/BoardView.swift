@@ -15,6 +15,7 @@ struct BoardView: View {
     /// Called when the win cascade has finished (or was clicked to skip it).
     var onCascadeFinished: () -> Void = {}
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.winAnimation) private var winAnimation
     @Environment(\.displayScale) private var displayScale
     @Environment(\.cardStyle) private var cardStyle
     @Environment(\.drawPileSide) private var drawPileSide
@@ -47,8 +48,8 @@ struct BoardView: View {
                         .opacity(cascading && p.isOnFoundation ? 0 : 1)
                 }
                 if cascading {
-                    WinCascade(foundations: store.state.foundations, layout: layout,
-                               onFinished: onCascadeFinished)
+                    WinAnimationView(kind: winAnimation ?? .cascade, foundations: store.state.foundations,
+                                     layout: layout, onFinished: onCascadeFinished)
                         .id(store.state.seed)               // a fresh cascade for every win
                         .zIndex(4000)
                 }
@@ -87,7 +88,9 @@ struct BoardView: View {
     }
 
     /// The win cascade runs (Reduce Motion: there is none).
-    private var cascading: Bool { store.state.isWon && !reduceMotion }
+    /// A won game plays its win animation (spec "Win animations") — none under Reduce Motion or
+    /// when the player chose None.
+    private var cascading: Bool { store.state.isWon && !reduceMotion && winAnimation != nil }
 
     private func card(_ p: CardPlacement, _ layout: BoardLayout) -> some View {
         let metrics = layout.metrics

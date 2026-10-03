@@ -277,6 +277,29 @@ list, and a **Top 10** button that opens Scores on that mode.
 Tests never touch the player's Top 10, iCloud or Game Center: UI tests use their own settings
 suite with iCloud and Game Center off.
 
+## Win animations
+
+A won game plays one of four animations over the board, then the win card appears (a tap skips
+straight to it). The player chooses in Settings ▸ **Win animation**: **Cascade** (the default),
+**Rainfall**, **Decay**, **Shuffle**, **Random** (one of the four, settled per game) or **None**.
+With Reduce Motion on, or None, nothing plays and the win card comes at once; VoiceOver users get
+the win card at once as before. Saved as `winAnimation`; an unknown value reads as Cascade.
+
+- **Cascade** — the classic: kings first, each card leaps off its pile, bounces along the bottom
+  leaving a trail, and leaves the screen; the trail stays.
+- **Rainfall** — kings first round the four piles, one card every 0.12 s drops from its pile with a
+  slight sway and spin, straight off the bottom.
+- **Decay** — each pile dissolves from the top down: the top card is eaten away along ragged,
+  noise-shaped edges with a thin burnt-orange rim, the card beneath showing through the holes; each
+  card over 0.55 s, the piles a quarter-second apart, until all four are gone. The dissolve is a Metal
+  shader (fractal noise against a rising threshold), so it is continuous at the display's frame
+  rate; building needs Xcode's Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`).
+- **Shuffle** — the cards gather into two half-piles, riffle into one deck, turn face down and
+  slide onto the draw pile, where they stay. It is only an animation: the next game is dealt as
+  usual.
+
+In every one the foundations keep their cards until each card's turn comes.
+
 ## Hard Core
 
 A harder game with limited passes through the deck: **one in Draw 1** (no redeal at all) and

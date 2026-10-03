@@ -22,6 +22,7 @@ struct ContentView: View {
     @AppStorage(AppSettings.cardFaceKey, store: AppSettings.defaults) private var cardFace = CardFaceStyle.classic
     @AppStorage(AppSettings.cardBackKey, store: AppSettings.defaults) private var cardBack = CardBackStyle.classicBlue
     @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
+    @AppStorage(AppSettings.winAnimationKey, store: AppSettings.defaults) private var winAnimation = WinAnimation.cascade
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -43,6 +44,7 @@ struct ContentView: View {
         .background(TableBackground().ignoresSafeArea())
         .environment(\.cardStyle, CardStyle(face: cardFace, back: cardBack))
         .environment(\.drawPileSide, drawPileSide)
+        .environment(\.winAnimation, playedAnimation)
         #if os(macOS)
         .background(QuitWhenClosed())
         #endif
@@ -126,6 +128,12 @@ struct ContentView: View {
         .task { gameCenter.signIn() }                                  // Game Center's own prompt, once
     }
 
+    /// The win animation this game plays: the chosen one, Random settled for this deal — or none
+    /// (None, or Reduce Motion), in which case the win card comes at once.
+    private var playedAnimation: WinAnimation? {
+        reduceMotion ? nil : winAnimation.resolved(seed: store.state.seed)
+    }
+
     /// Scores: a sheet on iPhone and iPad, its window on the Mac.
     private func showScores() {
         #if os(macOS)
@@ -150,7 +158,7 @@ struct ContentView: View {
             get: {
                 Self.showsWinSheet(isWon: store.state.isWon, dismissed: dismissedWinSeed == store.state.seed,
                                    cascadeFinished: cascadeFinishedSeed == store.state.seed,
-                                   reduceMotion: reduceMotion, voiceOver: voiceOver)
+                                   reduceMotion: playedAnimation == nil, voiceOver: voiceOver)
             },
             set: { shown in if !shown { dismissedWinSeed = store.state.seed } }
         )

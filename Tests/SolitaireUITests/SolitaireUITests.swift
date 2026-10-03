@@ -74,6 +74,24 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["You won!"].waitForNonExistence(timeout: 5), "Close dismisses it")
     }
 
+    /// Each win animation (spec "Win animations") plays to its end by itself and then the win card
+    /// appears; with None the win card comes at once.
+    func testEveryWinAnimationEndsInTheWinCard() {
+        for animation in ["rainfall", "decay", "shuffle"] {
+            let app = launch(scenario: "almostWon", arguments: ["-winAnimation", animation])
+            XCTAssertTrue(app.buttons["Auto-finish"].waitForExistence(timeout: 5))
+            app.buttons["Auto-finish"].press()
+            XCTAssertTrue(app.staticTexts["12 moves"].waitForExistence(timeout: 5), animation)
+            XCTAssertFalse(app.staticTexts["You won!"].waitForExistence(timeout: 1), "\(animation) plays uncovered")
+            XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 30), "\(animation) ends in the win card")
+            app.terminate()
+        }
+        let app = launch(scenario: "almostWon", arguments: ["-winAnimation", "none"])
+        XCTAssertTrue(app.buttons["Auto-finish"].waitForExistence(timeout: 5))
+        app.buttons["Auto-finish"].press()
+        XCTAssertTrue(app.staticTexts["You won!"].waitForExistence(timeout: 6), "None: the win card at once")
+    }
+
     /// Left alone, the cascade runs to its end and then the win sheet appears.
     func testWinSheetFollowsTheCascade() {
         let app = launch(scenario: "almostWon")
@@ -470,17 +488,20 @@ final class SolitaireUITests: XCTestCase {
         let night = app.buttons["Night"].firstMatch
         XCTAssertTrue(night.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Three cards"].exists, "the draw mode is the chip's, not a setting")
+        // The picker: labelled "Animation" on iPhone; on the Mac it shows its choice.
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Animation' OR label == 'Cascade' OR value == 'Cascade'")).firstMatch.exists,
+                      "the win animation picker")
         XCTAssertFalse(night.isSelected, "Classic is the default")
         night.press()
-        app.buttons["Art Deco"].firstMatch.press()
         XCTAssertTrue(night.isSelected)
+        revealInSettings(app, "Art Deco").press()
         app.terminate()
         app = launch(seed: 4, reset: false)
         XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5))
         more(app, "Settings")
         XCTAssertTrue(app.buttons["Night"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Night"].firstMatch.isSelected, "remembered")
-        XCTAssertTrue(app.buttons["Art Deco"].firstMatch.isSelected, "remembered")
+        XCTAssertTrue(revealInSettings(app, "Art Deco").isSelected, "remembered")
     }
 
     /// A saved face or back this version doesn't know (from an older or newer one) reads as the
@@ -491,7 +512,21 @@ final class SolitaireUITests: XCTestCase {
         more(app, "Settings")
         XCTAssertTrue(app.buttons["Classic"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Classic"].firstMatch.isSelected, "face falls back to Classic")
-        XCTAssertTrue(app.buttons["Classic Blue"].firstMatch.isSelected, "back falls back to Classic Blue")
+        XCTAssertTrue(revealInSettings(app, "Classic Blue").isSelected, "back falls back to Classic Blue")
+    }
+
+    /// A button in Settings, scrolled into view: iPhone's Settings sheet is taller than the screen
+    /// and iOS doesn't make rows that are off it. The Mac's Settings window shows everything.
+    @discardableResult
+    private func revealInSettings(_ app: XCUIApplication, _ label: String) -> XCUIElement {
+        let button = app.buttons[label].firstMatch
+        #if os(iOS)
+        for _ in 0..<6 where !(button.exists && button.isHittable) {
+            app.swipeUp(velocity: .slow)
+        }
+        #endif
+        XCTAssertTrue(button.waitForExistence(timeout: 3), "\(label) in Settings")
+        return button
     }
 
     /// About, from More: the version and the links to the site, the privacy policy and support.

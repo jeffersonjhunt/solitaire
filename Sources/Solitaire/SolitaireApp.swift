@@ -140,6 +140,8 @@ enum AppSettings {
     static let cardBackKey = "cardBack"
     /// Which side the draw pile sits on ("left" / "right"; spec "Top row"); unknown reads as left.
     static let drawPileSideKey = "drawPileSide"
+    /// The win animation (spec "Win animations"); unknown reads as Cascade.
+    static let winAnimationKey = "winAnimation"
     /// Whether a game in progress is asked about before a new deal replaces it (spec "New games
     /// and the draw mode"); unset or not a Bool reads as yes.
     static let askBeforeEndingGameKey = "askBeforeEndingGame"
