@@ -7,6 +7,10 @@
                                          its platforms), from a text file
     tools/asc.py pricing [--set]         price and countries: free, every territory, and new ones
                                          as Apple adds them; --set creates whichever is missing
+    tools/asc.py listing [--apply]       the App Store listing from docs/app-store/listing.json, on both
+                                         platforms: version, build, text, URLs, category, age rating
+                                         (all "none"), Game Center on, screenshots from
+                                         build/store-shots; without --apply it only lists differences
     tools/asc.py gamecenter [--create]   Game Center and iCloud for the app: the bundle ID's
                                          capabilities, the four leaderboards and their set (spec
                                          "Scores"); --create adds whatever is missing, and only that
@@ -16,6 +20,7 @@ $HOME/.config/appstoreconnect/api.env): ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH.
 signed with openssl, so the key never leaves the file.
 """
 import base64
+import hashlib
 import json
 import os
 import subprocess
@@ -256,6 +261,157 @@ def pricing(apply):
                 f"availability: all {len(territories)} territories, and new ones")
 
 
+LISTING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "app-store", "listing.json")
+SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "build", "store-shots")
+AGE_NONE = ["alcoholTobaccoOrDrugUseOrReferences", "contests", "gamblingSimulated", "gunsOrOtherWeapons",
+            "horrorOrFearThemes", "matureOrSuggestiveThemes", "medicalOrTreatmentInformation",
+            "profanityOrCrudeHumor", "sexualContentGraphicAndNudity", "sexualContentOrNudity",
+            "violenceCartoonOrFantasy", "violenceRealistic", "violenceRealisticProlongedGraphicOrSadistic"]
+AGE_NO = ["advertising", "ageAssurance", "gambling", "healthOrWellnessTopics", "lootBox", "messagingAndChat",
+          "parentalControls", "unrestrictedWebAccess", "userGeneratedContent", "socialMedia"]
+
+
+def patch(path, kind, ident, attributes=None, relationships=None, what=""):
+    data = {"type": kind, "id": ident}
+    if attributes:
+        data["attributes"] = attributes
+    if relationships:
+        data["relationships"] = relationships
+    status, d = call("PATCH", path, {"data": data})
+    if status not in (200, 204):
+        sys.exit(f"could not update {what}: {status} {json.dumps(d.get('errors', d) if d else '')[:600]}")
+    print(f"  updated: {what}")
+
+
+def differs(label, current, wanted, apply, action):
+    """Prints a difference; applies it with --apply. Returns whether there was one."""
+    if current == wanted:
+        return False
+    show = lambda v: (repr(v)[:70] + "…") if len(repr(v)) > 72 else repr(v)
+    print(f"  {label}: {show(current)} → {show(wanted)}")
+    if apply:
+        action()
+    return True
+
+
+def listing(apply):
+    want = json.load(open(LISTING))
+    description = "\n".join(want["description"])
+    app = app_id()
+    changes = 0
+
+    # The app's own info (both platforms): subtitle, privacy URL, subcategory, age rating.
+    info = [i for i in get(f"/v1/apps/{app}/appInfos")["data"]
+            if i["attributes"].get("appStoreState") != "READY_FOR_SALE"][0]
+    loc = get(f"/v1/appInfos/{info['id']}/appInfoLocalizations")["data"][0]
+    for key in ("subtitle", "privacyPolicyUrl"):
+        changes += differs(f"app info {key}", loc["attributes"].get(key), want[key], apply,
+                           lambda key=key: patch(f"/v1/appInfoLocalizations/{loc['id']}", "appInfoLocalizations",
+                                                 loc["id"], {key: want[key]}, what=f"app info {key}"))
+    sub = (get(f"/v1/appInfos/{info['id']}/primarySubcategoryOne").get("data") or {}).get("id")
+    changes += differs("subcategory", sub, want["primarySubcategory"], apply,
+                       lambda: patch(f"/v1/appInfos/{info['id']}", "appInfos", info["id"], relationships={
+                           "primarySubcategoryOne": rel("appCategories", want["primarySubcategory"])},
+                           what="subcategory"))
+    age = get(f"/v1/appInfos/{info['id']}/ageRatingDeclaration")["data"]
+    wanted_age = {**{k: "NONE" for k in AGE_NONE}, **{k: False for k in AGE_NO}}
+    current_age = {k: age["attributes"].get(k) for k in wanted_age}
+    changes += differs("age rating answers", sum(v is not None for v in current_age.values()) if current_age != wanted_age else "all none",
+                       "all none", apply,
+                       lambda: patch(f"/v1/ageRatingDeclarations/{age['id']}", "ageRatingDeclarations", age["id"],
+                                     wanted_age, what="age rating: every answer none / no"))
+
+    builds = {b["relationships"]["preReleaseVersion"]["data"]["id"]: b for b in
+              get(f"/v1/builds?filter[app]={app}&filter[version]={want['build']}&include=preReleaseVersion")["data"]}
+    platform_of_pre = {}
+    for b in get(f"/v1/builds?filter[app]={app}&filter[version]={want['build']}&include=preReleaseVersion").get("included", []):
+        platform_of_pre[b["id"]] = b["attributes"]["platform"]
+    build_for = {platform_of_pre[pre]: b["id"] for pre, b in builds.items()}
+
+    for v in get(f"/v1/apps/{app}/appStoreVersions?filter[appStoreState]=PREPARE_FOR_SUBMISSION,DEVELOPER_REJECTED,REJECTED")["data"]:
+        platform, vid, a = v["attributes"]["platform"], v["id"], v["attributes"]
+        print(f"{platform}:")
+        for key, value in (("versionString", want["version"]), ("copyright", want["copyright"]),
+                           ("releaseType", "AFTER_APPROVAL")):
+            changes += differs(key, a.get(key), value, apply,
+                               lambda key=key, value=value: patch(f"/v1/appStoreVersions/{vid}", "appStoreVersions",
+                                                                  vid, {key: value}, what=key))
+        current_build = (get(f"/v1/appStoreVersions/{vid}/build").get("data") or {}).get("id")
+        if platform not in build_for:
+            sys.exit(f"build {want['build']} has no {platform} upload")
+        changes += differs("build", current_build, build_for[platform], apply,
+                           lambda: patch(f"/v1/appStoreVersions/{vid}", "appStoreVersions", vid, relationships={
+                               "build": rel("builds", build_for[platform])}, what=f"build {want['build']}"))
+        vloc = [l for l in get(f"/v1/appStoreVersions/{vid}/appStoreVersionLocalizations")["data"]
+                if l["attributes"]["locale"] == "en-US"][0]
+        for key, value in (("description", description), ("keywords", want["keywords"]),
+                           ("promotionalText", want["promotionalText"]), ("supportUrl", want["supportUrl"]),
+                           ("marketingUrl", want["marketingUrl"])):
+            changes += differs(key, vloc["attributes"].get(key), value, apply,
+                               lambda key=key, value=value: patch(f"/v1/appStoreVersionLocalizations/{vloc['id']}",
+                                                                  "appStoreVersionLocalizations", vloc["id"],
+                                                                  {key: value}, what=key))
+        gc = get(f"/v1/appStoreVersions/{vid}/gameCenterAppVersion").get("data")
+        changes += differs("Game Center", bool(gc and gc["attributes"].get("enabled")), True, apply,
+                           lambda: post("/v1/gameCenterAppVersions", {"data": {
+                               "type": "gameCenterAppVersions",
+                               "relationships": {"appStoreVersion": rel("appStoreVersions", vid)}}},
+                               "Game Center for this version"))
+        for display, files in want["screenshots"][platform].items():
+            changes += screenshots(vloc["id"], display, files, apply)
+    print(("applied" if apply else "differences") + f": {changes}" if changes else "the listing matches")
+
+
+def screenshots(loc_id, display, files, apply):
+    """One screenshot set: exactly `files`, in order. A set that differs is emptied and refilled."""
+    sets = {s["attributes"]["screenshotDisplayType"]: s for s in
+            get(f"/v1/appStoreVersionLocalizations/{loc_id}/appScreenshotSets")["data"]}
+    current = []
+    if display in sets:
+        current = [s["attributes"]["fileName"] for s in
+                   get(f"/v1/appScreenshotSets/{sets[display]['id']}/appScreenshots")["data"]]
+    if current == files:
+        return 0
+    print(f"  screenshots {display}: {len(current)} → {len(files)} ({', '.join(files)})")
+    if not apply:
+        return 1
+    for name in files:
+        if not os.path.exists(os.path.join(SHOTS, name)):
+            sys.exit(f"missing {os.path.join(SHOTS, name)}")
+    if display in sets:
+        set_id = sets[display]["id"]
+        for s in get(f"/v1/appScreenshotSets/{set_id}/appScreenshots")["data"]:
+            status, d = call("DELETE", f"/v1/appScreenshots/{s['id']}")
+            if status not in (200, 204):
+                sys.exit(f"could not remove an old screenshot: {status}")
+    else:
+        set_id = post("/v1/appScreenshotSets", {"data": {
+            "type": "appScreenshotSets", "attributes": {"screenshotDisplayType": display},
+            "relationships": {"appStoreVersionLocalization": rel("appStoreVersionLocalizations", loc_id)}}},
+            f"screenshot set {display}")["data"]["id"]
+    ids = []
+    for name in files:
+        data = open(os.path.join(SHOTS, name), "rb").read()
+        shot = post("/v1/appScreenshots", {"data": {
+            "type": "appScreenshots", "attributes": {"fileName": name, "fileSize": len(data)},
+            "relationships": {"appScreenshotSet": rel("appScreenshotSets", set_id)}}}, f"screenshot {name}")["data"]
+        for op in shot["attributes"]["uploadOperations"]:
+            part = data[op["offset"]:op["offset"] + op["length"]]
+            req = urllib.request.Request(op["url"], data=part, method=op["method"],
+                                         headers={h["name"]: h["value"] for h in op.get("requestHeaders", [])})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                if r.status not in (200, 201, 204):
+                    sys.exit(f"upload of {name} failed: {r.status}")
+        patch(f"/v1/appScreenshots/{shot['id']}", "appScreenshots", shot["id"],
+              {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()}, what=f"uploaded {name}")
+        ids.append(shot["id"])
+    status, d = call("PATCH", f"/v1/appScreenshotSets/{set_id}/relationships/appScreenshots",
+                     {"data": [{"type": "appScreenshots", "id": i} for i in ids]})
+    if status not in (200, 204):
+        sys.exit(f"could not order {display}: {status} {json.dumps(d.get('errors', d) if d else '')[:300]}")
+    return 1
+
+
 def whats_new(build_number, path):
     """Sets the English "What to Test" text on every platform's upload of a build."""
     text = open(path).read().strip()
@@ -288,6 +444,8 @@ if __name__ == "__main__":
         bundle_id("--create" in sys.argv)
     elif cmd == "whats-new" and len(sys.argv) == 4:
         whats_new(sys.argv[2], sys.argv[3])
+    elif cmd == "listing":
+        listing("--apply" in sys.argv)
     elif cmd == "pricing":
         pricing("--set" in sys.argv)
     elif cmd == "gamecenter":
