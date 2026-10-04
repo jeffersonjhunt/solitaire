@@ -425,7 +425,9 @@ def screenshots(loc_id, display, files, apply):
 
 def submit(really):
     app = app_id()
-    versions = get(f"/v1/apps/{app}/appStoreVersions?filter[appStoreState]=PREPARE_FOR_SUBMISSION,DEVELOPER_REJECTED,REJECTED")["data"]
+    # READY_FOR_REVIEW: a version already in a draft submission (adding it there moves it on).
+    versions = get(f"/v1/apps/{app}/appStoreVersions?filter[appStoreState]="
+                   "PREPARE_FOR_SUBMISSION,READY_FOR_REVIEW,DEVELOPER_REJECTED,REJECTED")["data"]
     if not versions:
         sys.exit("no version waiting to be submitted")
     gcd = get(f"/v1/apps/{app}/gameCenterDetail")["data"]["id"]
