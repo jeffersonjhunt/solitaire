@@ -41,7 +41,8 @@ final class GameStore {
         didSet { if lastHardCore != oldValue { rememberHardCore?(lastHardCore) } }
     }
     @ObservationIgnored var rememberHardCore: ((Bool) -> Void)?
-    /// Called once when a move wins the game (spec "Scores": the app records it).
+    /// Called once when a move wins the game (spec "Scores": the app records it) — not for a
+    /// restarted game, which never counts (spec "Restart").
     @ObservationIgnored var onWin: ((GameState) -> Void)?
     /// The card being dragged (with its run), from `beginDrag` until `drop` or `cancelDrag`.
     private(set) var pendingDrag: PendingDrag?
@@ -89,7 +90,11 @@ final class GameStore {
     /// The live score (spec "Scoring"): the play score, and the time bonus once won.
     var score: Int { SolitaireEngine.score(state) }
     var playScore: Int { SolitaireEngine.playScore(state) }
-    var timeBonus: Int { state.isWon ? SolitaireEngine.timeBonus(seconds: Int(state.elapsed)) : 0 }
+    var timeBonus: Int {
+        state.isWon && !state.isRestarted ? SolitaireEngine.timeBonus(seconds: Int(state.elapsed)) : 0
+    }
+    /// Restart has something to do once a move has been made (a fresh deal is already the start).
+    var canRestart: Bool { state.moveCount > 0 }
     /// A game the player would lose by dealing again: a move (a draw included) made, and not won.
     /// Only such a game is asked about before a new deal replaces it.
     var isInProgress: Bool { state.moveCount > 0 && !state.isWon }
@@ -110,6 +115,16 @@ final class GameStore {
         lastDrawCount = Self.validDrawCount(drawCount)
         lastHardCore = hardCore ?? lastHardCore
         state = SolitaireEngine.newGame(drawCount: lastDrawCount, seed: makeSeed(), hardCore: lastHardCore)
+        undoStack.removeAll()
+        updateClock()
+    }
+
+    /// Deals this game again from the start (spec "Restart"); it scores 0 until a new game.
+    func restart() {
+        guard canRestart else { return }
+        stopAutoFinish()
+        pendingDrag = nil
+        state = SolitaireEngine.restart(state)
         undoStack.removeAll()
         updateClock()
     }
@@ -223,7 +238,7 @@ final class GameStore {
         record()
         SolitaireEngine.apply(move, to: &state)
         announce(state.isWon ? .win : .move)
-        if state.isWon { onWin?(state) }
+        if state.isWon && !state.isRestarted { onWin?(state) }
         updateClock()
     }
 

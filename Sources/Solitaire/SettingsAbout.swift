@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.drawPileSideKey, store: AppSettings.defaults) private var drawPileSide = DrawPileSide.left
     @AppStorage(AppSettings.winAnimationKey, store: AppSettings.defaults) private var winAnimation = WinAnimation.cascade
     @AppStorage(AppSettings.askBeforeEndingGameKey, store: AppSettings.defaults) private var askBeforeEndingGame = true
+    @AppStorage(AppSettings.restartButtonKey, store: AppSettings.defaults) private var restartButton = false
 
     private static let previewAce = Card(suit: .spades, rank: 1, isFaceUp: true)
     private static let previewKing = Card(suit: .hearts, rank: 13, isFaceUp: true)
@@ -65,6 +66,10 @@ struct SettingsView: View {
                 Toggle("Ask before ending a game", isOn: $askBeforeEndingGame)
                     .accessibilityLabel("Ask before ending a game")
                     .accessibilityHint("Asks before New Game or the draw switch replaces a game in progress")
+                    .tint(TableColors.accent)
+                Toggle("Restart button", isOn: $restartButton)
+                    .accessibilityLabel("Restart button")
+                    .accessibilityHint("Shows a button that plays the same deal again from the start. A restarted game scores 0")
                     .tint(TableColors.accent)
             }
             Section {

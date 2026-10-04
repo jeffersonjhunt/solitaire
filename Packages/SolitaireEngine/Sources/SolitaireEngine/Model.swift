@@ -60,6 +60,8 @@ public struct GameState: Codable, Sendable, Equatable {
     public var isHardCore: Bool
     /// Undos taken in this game (scoring). Undo itself never takes this back.
     public var undos: Int
+    /// This deal played again from the start (Restart): it scores 0 and is never recorded.
+    public var isRestarted: Bool
 
     /// Trips through the deck: the first is pass 1, and each redeal starts another.
     public var passes: Int { redeals + 1 }
@@ -70,7 +72,7 @@ public struct GameState: Codable, Sendable, Equatable {
     public init(stock: [Card], waste: [Card], foundations: [[Card]], tableau: [[Card]],
                 drawCount: Int, moveCount: Int = 0, elapsed: TimeInterval = 0,
                 isWon: Bool = false, seed: UInt64 = 0, redeals: Int = 0, isHardCore: Bool = false,
-                undos: Int = 0) {
+                undos: Int = 0, isRestarted: Bool = false) {
         self.stock = stock
         self.waste = waste
         self.foundations = foundations
@@ -83,10 +85,12 @@ public struct GameState: Codable, Sendable, Equatable {
         self.redeals = redeals
         self.isHardCore = isHardCore
         self.undos = undos
+        self.isRestarted = isRestarted
     }
 
     /// Decodes a saved game. Saves from before passes were counted have no `redeals` and resume
-    /// with none; saves from before Hard Core are normal games, and from before scoring have no undos.
+    /// with none; saves from before Hard Core are normal games, from before scoring have no undos,
+    /// and from before Restart were never restarted.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         stock = try c.decode([Card].self, forKey: .stock)
@@ -101,6 +105,7 @@ public struct GameState: Codable, Sendable, Equatable {
         redeals = try c.decodeIfPresent(Int.self, forKey: .redeals) ?? 0
         isHardCore = try c.decodeIfPresent(Bool.self, forKey: .isHardCore) ?? false
         undos = try c.decodeIfPresent(Int.self, forKey: .undos) ?? 0
+        isRestarted = try c.decodeIfPresent(Bool.self, forKey: .isRestarted) ?? false
     }
 
     /// The cards of any pile, bottom to top.

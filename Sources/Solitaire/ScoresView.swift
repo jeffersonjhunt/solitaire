@@ -109,7 +109,7 @@ struct ScoresView: View {
                 .font(AppFont.mono(13, relativeTo: .footnote))
                 .foregroundStyle(DialogColors.label)
                 .frame(width: 24, alignment: .leading)
-            Text("\(entry.score)")
+            Text(verbatim: "\(entry.score)")
                 .font(AppFont.mono(17, bold: true, relativeTo: .body))
                 .foregroundStyle(DialogColors.title)
                 .frame(minWidth: 52, alignment: .leading)

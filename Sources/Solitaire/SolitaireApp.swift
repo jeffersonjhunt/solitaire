@@ -145,6 +145,8 @@ enum AppSettings {
     /// Whether a game in progress is asked about before a new deal replaces it (spec "New games
     /// and the draw mode"); unset or not a Bool reads as yes.
     static let askBeforeEndingGameKey = "askBeforeEndingGame"
+    /// Settings ▸ Restart button (off by default; spec "Restart").
+    static let restartButtonKey = "restartButton"
 
     static var askBeforeEndingGame: Bool { askBeforeEndingGame(in: defaults) }
 
@@ -178,6 +180,7 @@ enum AppSettings {
 struct GameCommands: Commands {
     let store: GameStore
     let ui: AppUI
+    @AppStorage(AppSettings.restartButtonKey, store: AppSettings.defaults) private var showsRestart = false
 
     var body: some Commands {
         // Every game command stands down while a card is up, so nothing changes behind it.
@@ -203,6 +206,11 @@ struct GameCommands: Commands {
                 Button("Auto-finish") { store.autoFinish() }
                     .keyboardShortcut(.return)
                     .disabled(!store.canAutoFinish)
+                if showsRestart {
+                    Button("Restart Game") { ui.requestRestart(store: store) }
+                        .keyboardShortcut("r")
+                        .disabled(!store.canRestart)
+                }
                 Divider()
                 // Switches as the draw chip does: a new deal in the other mode, asked first mid-game.
                 Toggle("Draw Three", isOn: Binding(

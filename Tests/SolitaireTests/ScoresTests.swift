@@ -85,6 +85,29 @@ import SolitaireEngine
         #expect(wins.count == 1 && wins[0].isWon)
     }
 
+    /// A restarted game's win counts nowhere (spec "Restart"): the store doesn't report it, the
+    /// Top 10 doesn't take it, and it gets no badge even when its first playing made the list.
+    @Test func aRestartedWinCountsNowhere() throws {
+        let (d, name) = try suite()
+        defer { d.removePersistentDomain(forName: name) }
+        let book = ScoreBook(local: d, cloud: nil)
+        #expect(book.record(wonState()) == 1, "the first playing of seed 42")
+        var replay = wonState()
+        replay.isRestarted = true
+        #expect(book.record(replay) == nil && book.lists.draw1.count == 1)
+        #expect(book.rank(ofWin: replay) == nil)
+
+        let store = makeStore()
+        let king = replay.foundations[3].removeLast()
+        replay.isWon = false
+        replay.tableau[0] = [king]
+        store.resume(from: replay)
+        var wins: [GameState] = []
+        store.onWin = { wins.append($0) }
+        #expect(store.tap(pile: .tableau(0), index: 0) && store.state.isWon)
+        #expect(wins.isEmpty && store.score == 0 && store.timeBonus == 0)
+    }
+
     /// Tests never reach iCloud or Game Center.
     @Test func testsStayOffOutsideServices() {
         #expect(!AppSettings.usesOutsideServices)

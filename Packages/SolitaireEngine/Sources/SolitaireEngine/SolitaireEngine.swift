@@ -8,6 +8,14 @@ public enum SolitaireEngine {
 
     /// A fresh deal: column i gets i+1 cards with only its last card face up; the other 24 cards
     /// form the stock, face down. `hardCore`: passes through the deck are limited.
+    /// The same deal again from the start (spec "Restart"): the same cards, draw mode and Hard
+    /// Core, with moves, time, passes and undos back to none — marked restarted, so it scores 0.
+    public static func restart(_ state: GameState) -> GameState {
+        var fresh = newGame(drawCount: state.drawCount, seed: state.seed, hardCore: state.isHardCore)
+        fresh.isRestarted = true
+        return fresh
+    }
+
     public static func newGame(drawCount: Int, seed: UInt64, hardCore: Bool = false) -> GameState {
         precondition(drawCount == 1 || drawCount == 3, "drawCount must be 1 or 3")
         var deck = Suit.allCases.flatMap { suit in (1...13).map { Card(suit: suit, rank: $0) } }
@@ -178,14 +186,17 @@ public enum SolitaireEngine {
     /// The most a win's time bonus can be: all of it, under a minute.
     public static let maxTimeBonus = 600
 
-    /// The score: the play score, plus the time bonus once the game is won.
+    /// The score: the play score, plus the time bonus once the game is won. A restarted game
+    /// scores 0.
     public static func score(_ state: GameState) -> Int {
-        playScore(state) + (isWon(state) ? timeBonus(seconds: Int(state.elapsed)) : 0)
+        guard !state.isRestarted else { return 0 }
+        return playScore(state) + (isWon(state) ? timeBonus(seconds: Int(state.elapsed)) : 0)
     }
 
     /// The points earned in play, worked out from the game itself: +5 per card on a foundation,
     /// +35 per complete suit, −3 per undo, −100 per redeal; never below 0.
     public static func playScore(_ state: GameState) -> Int {
+        guard !state.isRestarted else { return 0 }
         let onFoundations = state.foundations.reduce(0) { $0 + $1.count }
         let suits = state.foundations.filter { $0.count == 13 }.count
         return max(5 * onFoundations + 35 * suits - 3 * state.undos - 100 * state.redeals, 0)
