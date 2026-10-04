@@ -155,13 +155,14 @@ extension CardFaceStyle: TitledStyle {}
 extension CardBackStyle: TitledStyle {}
 
 /// About (spec "Settings, About and the More menu"): the app, its version, its maker, links (which
-/// open in the browser — the app itself has no network code), and acknowledgements.
+/// open in the browser — the app's own code has no network code; iCloud and Game Center are the
+/// system's), and acknowledgements.
 struct AboutView: View {
     @State private var showingLicence = false
 
     static let website = URL(string: "https://oneoffendeavors.com")!
     static let privacy = URL(string: "https://oneoffendeavors.com/solitaire/privacy/")!
-    static let support = URL(string: "https://oneoffendeavors.com/support/")!
+    static let support = URL(string: "https://oneoffendeavors.com/solitaire/support/")!
 
     static var version: String {
         let info = Bundle.main.infoDictionary ?? [:]
@@ -186,7 +187,7 @@ struct AboutView: View {
                     Text("Version \(Self.version)")
                         .font(AppFont.mono(12, relativeTo: .caption))
                         .foregroundStyle(.secondary)
-                    Text("Klondike, made by One Off Endeavors. No ads, no accounts, no tracking — nothing leaves your device.")
+                    Text("Klondike, made by One Off Endeavors. No ads, no tracking, nothing to sign up for. Your Top 10 syncs through your own iCloud, and your wins go to Game Center when you're signed in.")
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
                         .padding(.top, 6)

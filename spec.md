@@ -2,7 +2,7 @@
 
 Sep 27, 2026 · @Jefferson
 
-A single SwiftUI Klondike solitaire app for macOS, iOS and iPadOS: one shared game engine, one adaptive board view, no network code, no ads, no in-app purchases, no accounts.
+A single SwiftUI Klondike solitaire app for macOS, iOS and iPadOS: one shared game engine, one adaptive board view, no network code of its own (1.1's iCloud sync and Game Center go through the system's services), no ads, no in-app purchases, no accounts.
 
 ## Scope and platforms
 
@@ -17,7 +17,7 @@ One Xcode project, one multiplatform app target, one shared SwiftUI codebase. Pl
 | Orientations | iPhone portrait and landscape; iPad all four; Mac resizable window |
 | Game | Klondike only |
 
-Explicitly out of scope: ads, in-app purchases, accounts, sign-in, analytics, crash reporting, remote config, and any network request. The app ships with no `NSAppTransportSecurity` needs and no entitlements beyond sandbox defaults. iCloud sync is out of scope for v1 but the save format must not block it later.
+Explicitly out of scope: ads, in-app purchases, accounts of our own, sign-in to us, analytics, crash reporting, remote config, and any network request from the app's own code. The app ships with no `NSAppTransportSecurity` needs. Version 1.0 had no entitlements beyond sandbox defaults; 1.1 adds Game Center and the iCloud key-value store (see "Scores"), both reached through the system, never a connection the app opens.
 
 The app must launch straight into a playable board with no splash screen, onboarding, or modal.
 
@@ -379,17 +379,19 @@ where it is, so a game cannot be won behind the question; Finish is offered agai
 panel):
 
 - the app icon, **Solitaire**, and **Version 1.1 (build)** from the bundle;
-- one line: Klondike, made by One Off Endeavors; no ads, no accounts, no tracking — nothing leaves
-  your device;
+- one line: "Klondike, made by One Off Endeavors. No ads, no tracking, nothing to sign up for. Your
+  Top 10 syncs through your own iCloud, and your wins go to Game Center when you're signed in."
+  (1.0 said "nothing leaves your device", untrue once 1.1 added iCloud and Game Center);
 - links: **One Off Endeavors** (https://oneoffendeavors.com), **Privacy policy**
   (https://oneoffendeavors.com/solitaire/privacy/), **Support and feedback**
-  (https://oneoffendeavors.com/support/);
+  (https://oneoffendeavors.com/solitaire/support/, the app's support page; the App Store's Support URL too);
 - **Acknowledgements:** Space Mono, © 2016 The Space Mono Project Authors, SIL Open Font License 1.1,
   with the licence's full text one tap away;
 - **© 2026 One Off Endeavors**.
 
-A link opens in the user's default browser. The app itself still makes no network connection of any
-kind (on the Mac it remains sandboxed without a network permission).
+A link opens in the user's default browser. The app's own code still makes no network connection
+(on the Mac it remains sandboxed without a network permission); iCloud and Game Center are the
+system's services.
 
 ## Restart
 
@@ -433,7 +435,7 @@ Build the engine and its tests before any view. The app is done when all of thes
 - [ ] Force-quitting mid-game and relaunching restores the same board, move count and elapsed time.
 - [ ] The board lays out without clipping on iPhone SE portrait, iPhone Pro Max landscape, iPad split view at one third width, and a 600 pt wide Mac window.
 - [ ] Instruments shows no dropped frames while dragging a 13-card run on the oldest supported device.
-- [ ] The app builds with no third-party packages and makes no network calls (verify with a proxy or by removing network entitlement).
+- [ ] The app builds with no third-party packages and its own code makes no network calls (the Mac app has no network entitlement; iCloud and Game Center go through the system).
 
 Open decisions for whoever builds it: whether to ship a win animation (a cascade of cards is the classic, and SpriteKit would be the only added framework), whether to add a hint button, and whether the Mac version gets a full-screen felt background or stays in a bordered window.
 

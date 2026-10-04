@@ -5,6 +5,8 @@
     tools/asc.py bundle-id [--create]    look up (or register) the app's bundle ID
     tools/asc.py whats-new <build> <file>   the "What to Test" notes testers see for that build (all
                                          its platforms), from a text file
+    tools/asc.py pricing [--set]         price and countries: free, every territory, and new ones
+                                         as Apple adds them; --set creates whichever is missing
     tools/asc.py gamecenter [--create]   Game Center and iCloud for the app: the bundle ID's
                                          capabilities, the four leaderboards and their set (spec
                                          "Scores"); --create adds whatever is missing, and only that
@@ -211,6 +213,49 @@ def gamecenter(create):
                  f"{len(missing)} leaderboards added to the set")
 
 
+def app_id():
+    apps = get("/v1/apps?filter[bundleId]=" + urllib.parse.quote(BUNDLE_ID))["data"]
+    if not apps:
+        sys.exit(f"no App Store Connect app with bundle ID {BUNDLE_ID}")
+    return apps[0]["id"]
+
+
+def pricing(apply):
+    """Free, in every territory (the 1.1 decision). Neither can be changed back to "unset", only
+    to another price or list, so --set only ever creates what is missing."""
+    app = app_id()
+    status, prices = call("GET", f"/v1/appPriceSchedules/{app}/manualPrices?include=appPricePoint")
+    points = [i["attributes"].get("customerPrice") for i in prices.get("included", [])] if status == 200 else []
+    print(f"  price: {'free' if points == ['0.0'] else (points or 'not set')}")
+    if not points and apply:
+        free = [p for p in get(f"/v1/apps/{app}/appPricePoints?filter[territory]=USA&limit=5")["data"]
+                if p["attributes"]["customerPrice"] in ("0", "0.0", "0.00")]
+        if len(free) != 1:
+            sys.exit("could not find the free price point")
+        post("/v1/appPriceSchedules", {
+            "data": {"type": "appPriceSchedules", "relationships": {
+                "app": rel("apps", app), "baseTerritory": rel("territories", "USA"),
+                "manualPrices": {"data": [{"type": "appPrices", "id": "${free}"}]}}},
+            "included": [{"type": "appPrices", "id": "${free}", "attributes": {"startDate": None},
+                          "relationships": {"appPricePoint": rel("appPricePoints", free[0]["id"])}}]},
+            "price schedule: free (base territory USA)")
+    status, avail = call("GET", f"/v1/apps/{app}/appAvailabilityV2")
+    if status == 200:
+        a = avail["data"]["attributes"]
+        print(f"  availability: set (new territories automatically: {a.get('availableInNewTerritories')})")
+    else:
+        print("  availability: not set")
+        if apply:
+            territories = [t["id"] for t in get("/v1/territories?limit=200")["data"]]
+            post("/v2/appAvailabilities", {
+                "data": {"type": "appAvailabilities", "attributes": {"availableInNewTerritories": True},
+                         "relationships": {"app": rel("apps", app), "territoryAvailabilities": {
+                             "data": [{"type": "territoryAvailabilities", "id": f"${{{t}}}"} for t in territories]}}},
+                "included": [{"type": "territoryAvailabilities", "id": f"${{{t}}}", "attributes": {"available": True},
+                              "relationships": {"territory": rel("territories", t)}} for t in territories]},
+                f"availability: all {len(territories)} territories, and new ones")
+
+
 def whats_new(build_number, path):
     """Sets the English "What to Test" text on every platform's upload of a build."""
     text = open(path).read().strip()
@@ -243,6 +288,8 @@ if __name__ == "__main__":
         bundle_id("--create" in sys.argv)
     elif cmd == "whats-new" and len(sys.argv) == 4:
         whats_new(sys.argv[2], sys.argv[3])
+    elif cmd == "pricing":
+        pricing("--set" in sys.argv)
     elif cmd == "gamecenter":
         gamecenter("--create" in sys.argv)
     else:
