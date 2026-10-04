@@ -98,8 +98,7 @@ struct ContentView: View {
             if let request = ui.pendingNewGame {
                 DialogScrim(outside: { ui.pendingNewGame = nil }) {
                     QuestionCard(request: request, cancel: { ui.pendingNewGame = nil }) {
-                        ui.pendingNewGame = nil
-                        store.newGame(drawCount: request.drawCount, hardCore: request.hardCore)
+                        ui.confirmPending(store: store)
                     }
                 }
                 .transition(.opacity)

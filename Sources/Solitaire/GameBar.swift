@@ -130,7 +130,8 @@ struct GameHeader: View {
     }
 }
 
-/// The four controls along the bottom, the same on every platform: Undo, Finish (burnt orange
+/// The controls along the bottom, the same on every platform: Undo, Restart (only with Settings ▸
+/// Restart button on), Finish (burnt orange
 /// when auto-finish is available), New Game (deals at once in the same mode; asks first mid-game)
 /// and More. Each is a 60 pt
 /// tall target; on iPad and the Mac the row is centred, at most 560 pt wide. `withStats`: a phone
@@ -140,6 +141,7 @@ struct ActionBar: View {
     let store: GameStore
     let ui: AppUI
     var withStats = false
+    @AppStorage(AppSettings.restartButtonKey, store: AppSettings.defaults) private var showsRestart = false
 
     var body: some View {
         HStack(spacing: 16) {
@@ -165,6 +167,14 @@ struct ActionBar: View {
             Button { store.undo() } label: { BarLabel(title: "Undo", symbol: "arrow.uturn.backward") }
                 .disabled(!store.canUndo)                       // also off once the game is won
                 .focusable(false)
+            if showsRestart {
+                Button { ui.requestRestart(store: store) } label: {
+                    BarLabel(title: "Restart", symbol: "arrow.counterclockwise")
+                }
+                .disabled(!store.canRestart)                    // a fresh deal is already the start
+                .accessibilityHint("Plays the same deal again from the start. A restarted game scores 0")
+                .focusable(false)
+            }
             Button { store.autoFinish() } label: { BarLabel(title: "Finish", symbol: "forward") }
                 .buttonStyle(BarButtonStyle(prominent: store.canAutoFinish))
                 .disabled(!store.canAutoFinish)

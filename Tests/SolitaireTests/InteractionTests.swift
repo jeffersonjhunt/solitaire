@@ -338,3 +338,62 @@ import SolitaireEngine
         #expect(SolitaireEngine.canMove(Move(source: .tableau(0), index: 0, destination: .tableau(1)), in: s))
     }
 }
+
+// MARK: - Restart (spec "Restart")
+
+@MainActor @Suite struct Restarting {
+    /// A fresh deal is already the start: nothing to restart, nothing marked.
+    @Test func aFreshDealHasNothingToRestart() {
+        let store = makeStore()
+        let ui = AppUI()
+        #expect(!store.canRestart)
+        ui.requestRestart(store: store)
+        #expect(ui.pendingNewGame == nil && !store.state.isRestarted)
+    }
+
+    /// Mid-game it asks; Cancel keeps the game; confirming deals the same cards from the start.
+    @Test func midGameItAsksThenDealsTheSameGameAgain() throws {
+        let store = makeStore()
+        let ui = AppUI()
+        ui.asksBeforeEndingGame = { true }
+        let deal = store.state
+        store.tapStock(); store.tick(); store.tick()
+        let move = try #require(legalMoves(store.state).first)
+        store.drop(source: move.source, index: move.index, on: move.destination)
+        let played = store.state
+        ui.requestRestart(store: store)
+        let ask = try #require(ui.pendingNewGame)
+        #expect(ask.restarts && ask.title == "Restart this game?" && ask.confirm == "Restart" && ask.kicker == "RESTART")
+        #expect(store.state == played, "nothing happens until it is confirmed")
+        ui.pendingNewGame = nil                                     // Cancel
+        ui.requestRestart(store: store)
+        ui.confirmPending(store: store)
+        var unmarked = store.state
+        unmarked.isRestarted = false
+        #expect(ui.pendingNewGame == nil && store.state.isRestarted && unmarked == deal)
+        #expect(!store.canUndo && store.score == 0)
+    }
+
+    @Test func withAskingOffItRestartsAtOnce() {
+        let store = makeStore()
+        let ui = AppUI()
+        ui.asksBeforeEndingGame = { false }
+        store.tapStock()
+        ui.requestRestart(store: store)
+        #expect(ui.pendingNewGame == nil && store.state.isRestarted && store.state.moveCount == 0)
+    }
+
+    /// The mark lasts through play and further restarts; a new game clears it.
+    @Test func onlyANewGameClearsTheMark() {
+        let store = makeStore()
+        let ui = AppUI()
+        ui.asksBeforeEndingGame = { false }
+        store.tapStock(); ui.requestRestart(store: store)
+        store.tapStock(); store.undo(); store.tapStock()
+        #expect(store.state.isRestarted && store.score == 0)
+        ui.requestRestart(store: store)
+        #expect(store.state.isRestarted)
+        ui.requestNewGame(store: store)
+        #expect(!store.state.isRestarted && store.state.seed != 42)
+    }
+}

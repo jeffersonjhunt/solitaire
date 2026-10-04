@@ -80,7 +80,7 @@ final class ScoreBook {
     /// Records a won game; returns its place in its mode's Top 10, or nil if it didn't make it.
     @discardableResult
     func record(_ state: GameState, date: Date = .now) -> Int? {
-        guard state.isWon else { return nil }
+        guard state.isWon, !state.isRestarted else { return nil }   // a replay never counts
         let entry = ScoreEntry(id: UUID(), score: SolitaireEngine.score(state), elapsed: state.elapsed,
                                date: date, hardCore: state.isHardCore)
         let rank = lists.add(entry, drawCount: state.drawCount)
@@ -91,7 +91,7 @@ final class ScoreBook {
 
     /// The place a won game took, if it made the Top 10 (nil for any other game).
     func rank(ofWin state: GameState) -> Int? {
-        guard let latest, state.isWon, latest.seed == state.seed else { return nil }
+        guard let latest, state.isWon, !state.isRestarted, latest.seed == state.seed else { return nil }
         return latest.rank
     }
 

@@ -514,3 +514,40 @@ enum GoldenDeal {
         #expect(try JSONDecoder().decode(GameState.self, from: data) == s)
     }
 }
+
+// MARK: - Restart (spec "Restart")
+
+@Suite struct Restarting {
+    @Test func theSameDealFromTheStartMarkedRestarted() throws {
+        var s = E.newGame(drawCount: 3, seed: 11, hardCore: true)
+        let fresh = s
+        s.stock.removeLast(3); s.moveCount = 9; s.elapsed = 75; s.undos = 2; s.redeals = 1
+        let again = E.restart(s)
+        #expect(again.isRestarted)
+        var unmarked = again
+        unmarked.isRestarted = false
+        #expect(unmarked == fresh, "the same cards, mode and Hard Core, with nothing played")
+        #expect(!fresh.isRestarted && !E.newGame(drawCount: 1, seed: 11).isRestarted)
+    }
+
+    /// A restarted game scores 0, however it is played — a win included.
+    @Test func aRestartedGameScoresZero() {
+        var s = E.restart(E.newGame(drawCount: 1, seed: 3))
+        s.foundations = Suit.allCases.map { suit in (1...13).map { Card(suit: suit, rank: $0, isFaceUp: true) } }
+        s.tableau = Array(repeating: [], count: 7); s.stock = []; s.waste = []
+        s.elapsed = 30
+        #expect(E.isWon(s) && E.playScore(s) == 0 && E.score(s) == 0)
+        s.isRestarted = false
+        #expect(E.score(s) == 1000, "the same win, not restarted")
+    }
+
+    @Test func theMarkIsSavedAndOlderSavesWereNeverRestarted() throws {
+        let s = E.restart(E.newGame(drawCount: 1, seed: 7))
+        let data = try JSONEncoder().encode(s)
+        #expect(try JSONDecoder().decode(GameState.self, from: data) == s)
+        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "isRestarted")
+        let old = try JSONDecoder().decode(GameState.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(!old.isRestarted)
+    }
+}

@@ -114,6 +114,7 @@ enum HowToPlay {
             "The bar along the bottom: **Undo**, **Finish** (auto-finish, once every card can go home), **New Game** and **More** (How to Play, Settings — with the card faces and backs — and About).",
             "**DRAW 1 / DRAW 3** at the top switches mode by starting a new game (so does **Game ▸ Draw Three**). Mid-game, it and **New Game** ask first (unless you've turned that off in Settings).",
             "**⌘Z** undo · **⌘N** new game · **⌘↩\u{FE0E}** auto-finish · **File ▸ New Game: Draw 1 / Draw 3** · **Settings (⌘,)**.",
+            "Turn on **Restart button** in Settings and **Restart** (or **⌘R**) plays the same deal again from the start. A restarted game scores 0 and doesn't count toward your Top 10 or Game Center.",
             "A card with nowhere to go wiggles. Clicking a card on a foundation does nothing — drag it if you mean to.",
         ]
         #else
@@ -123,6 +124,7 @@ enum HowToPlay {
             "The bar along the bottom: **Undo**, **Finish** (auto-finish, once every card can go home), **New Game** (same draw mode) and **More** (How to Play, Settings — with the card faces and backs — and About).",
             "Tap **DRAW 1 / DRAW 3** at the top to switch mode — that starts a new game. Mid-game, it and **New Game** ask first (unless you've turned that off in Settings).",
             "With a keyboard: **⌘Z** undo · **⌘N** new game · **Space** draw · **⌘↩\u{FE0E}** auto-finish.",
+            "Turn on **Restart button** in Settings and **Restart**, beside Undo, plays the same deal again from the start. A restarted game scores 0 and doesn't count toward your Top 10 or Game Center.",
             "A card with nowhere to go wiggles. Tapping a card on a foundation does nothing — drag it if you mean to.",
         ]
         #endif

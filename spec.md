@@ -156,7 +156,7 @@ Haptics on iOS and iPadOS only: a light impact on a successful move, a soft impa
 | Face-up fan | Card height × 0.29, scaled down together with the face-down fan when a column would overflow the board |
 | Minimum hit target | 44 pt on touch; cards below that width force a compressed layout |
 
-The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with the score, elapsed time, moves and the draw chip (the current game's draw mode, a button) in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
+The same seven-column board is used on every platform: on a Mac or iPad the cards simply get larger until the 900 pt cap, and the extra height goes to the tableau. The controls are the same everywhere too (decision 2026-10-01): a header over the board with the score, elapsed time, moves and the draw chip (the current game's draw mode, a button) in Space Mono, and a bar along the bottom with four labelled 60 pt buttons — Undo, Finish (auto-finish; burnt orange when available), New Game and More (How to Play, Settings… and About Solitaire) — or five, with Restart after Undo, when Settings ▸ Restart button is on (see "Restart"). On a phone held sideways the header folds into the bar, whose buttons are then 52 pt.
 
 Cards are drawn in SwiftUI, not images, in the face and back the player has chosen (see "Card styles"): a rounded rectangle with a hairline border and a 1 pt shadow, corner index top-left, a large suit below it.
 
@@ -341,8 +341,8 @@ the Mac, ⌘, and Solitaire ▸ Settings… open Settings, and Solitaire ▸ Abo
   game's mode and changing it deals a new game), and **Draw pile on the right** (off by default:
   the stock and waste sit on the left). Turning it on mirrors the top row at once, the game in
   progress included; cards that are moving finish where the new layout puts them. Then **Ask
-  before ending a game** (on by default; see "New games and the draw mode"). (The draw mode is not
-  a setting: the draw chip switches it.)
+  before ending a game** (on by default; see "New games and the draw mode"), and **Restart button**
+  (off by default; see "Restart"). (The draw mode is not a setting: the draw chip switches it.)
 - **Card face:** the four faces as tappable previews (an ace of hearts in each), the current one
   ringed in burnt orange (#CC5500).
 - **Card back:** the four backs as tappable previews, ringed the same way.
@@ -378,7 +378,7 @@ where it is, so a game cannot be won behind the question; Finish is offered agai
 **About** — a sheet on iPhone and iPad, its own window on the Mac (replacing the standard About
 panel):
 
-- the app icon, **Solitaire**, and **Version 1.0 (build)** from the bundle;
+- the app icon, **Solitaire**, and **Version 1.1 (build)** from the bundle;
 - one line: Klondike, made by One Off Endeavors; no ads, no accounts, no tracking — nothing leaves
   your device;
 - links: **One Off Endeavors** (https://oneoffendeavors.com), **Privacy policy**
@@ -390,6 +390,25 @@ panel):
 
 A link opens in the user's default browser. The app itself still makes no network connection of any
 kind (on the Mac it remains sandboxed without a network permission).
+
+## Restart
+
+An option (decision 2026-10-03, U25): **Settings ▸ Game ▸ Restart button**, off by default. With it
+on, a **Restart** button (↺, `arrow.counterclockwise`) sits in the bottom bar right after Undo —
+Undo, Restart, Finish, New Game, More — and the Mac's Game menu gains **Restart Game** (⌘R).
+
+- Restart deals **this same game again from the start**: the same cards (the same seed), draw
+  mode and Hard Core, with moves, time, passes and undos back to none and undo history cleared.
+  It works at any point, a won game included; on a fresh deal (no move yet) it is disabled.
+- A game in progress is asked about first, as for a new game (and not when Ask before ending a
+  game is off): kicker **RESTART**, "Restart this game?", "You’ll play the same deal again from
+  the beginning. A restarted game scores 0 and doesn’t count toward your Top 10 or Game Center."
+  — **Restart** / **Cancel**.
+- A restarted game is marked (`isRestarted` in the state, saved with it; older saves were never
+  restarted). While marked, its score — header and win card — is **0**, with no other label, and
+  its win goes to **neither the Top 10 nor Game Center** and gets no "New Top 10" badge. Restarting
+  again keeps the mark; New Game, the draw chip, the Mac's draw items and the Hard Core switch deal
+  a new game, which clears it.
 
 ## Persistence and settings
 

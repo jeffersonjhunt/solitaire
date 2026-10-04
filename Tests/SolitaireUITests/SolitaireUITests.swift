@@ -294,6 +294,47 @@ final class SolitaireUITests: XCTestCase {
         XCTAssertEqual(app.descendants(matching: .any)["drawChip"].label, "Draw three")
     }
 
+    /// Restart (spec "Restart"): no button until Settings ▸ Restart button is on; then it is off on
+    /// a fresh deal, asks mid-game, and deals the same cards again; the setting survives a relaunch.
+    func testRestart() {
+        var app = launch(seed: 7)
+        let stock = app.descendants(matching: .any)["Stock, 24 cards"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 5))
+        let deal = dealSignature(app)
+        XCTAssertFalse(app.buttons["Restart"].exists, "off by default")
+        more(app, "Settings")
+        let toggle = settingsSwitch(app, "Restart button")
+        XCTAssertEqual(toggle.map { "\($0.value ?? "")" }, "0", "off by default")
+        toggle?.press()
+        closeSettings(app)
+        let restart = app.buttons["Restart"].firstMatch
+        XCTAssertTrue(restart.waitForExistence(timeout: 5), "in the bar")
+        XCTAssertFalse(restart.isEnabled, "a fresh deal is already the start")
+        stock.press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5))
+        restart.press()
+        let ask = confirmation(app)
+        XCTAssertNotNil(ask, "mid-game, it asks")
+        XCTAssertTrue(ask?.staticTexts["Restart this game?"].exists ?? false)
+        ask?.buttons["Cancel"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 3), "Cancel keeps the game")
+        restart.press()
+        confirmation(app)?.buttons["Restart"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 24 cards"].waitForExistence(timeout: 5), "from the start")
+        XCTAssertEqual(dealSignature(app), deal, "the same deal")
+        XCTAssertTrue(app.descendants(matching: .any)["Score 0"].exists)
+        #if os(macOS)
+        app.descendants(matching: .any)["Stock, 24 cards"].press()
+        XCTAssertTrue(app.descendants(matching: .any)["Stock, 23 cards"].waitForExistence(timeout: 5))
+        app.typeKey("r", modifierFlags: .command)
+        XCTAssertNotNil(confirmation(app), "⌘R restarts too")
+        app.typeKey(.escape, modifierFlags: [])
+        #endif
+        app.terminate()
+        app = launch(seed: 7, reset: false)
+        XCTAssertTrue(app.buttons["Restart"].firstMatch.waitForExistence(timeout: 5), "still on after a relaunch")
+    }
+
     /// Hard Core (spec "Hard Core"): the Settings switch deals a Hard Core game at once on a fresh
     /// deal; Draw 1 then gets one pass — the empty stock shows ✕ and doesn't redeal; turning it off
     /// mid-game asks, and Cancel keeps the Hard Core game.
