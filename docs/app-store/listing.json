@@ -3,6 +3,7 @@
   "version": "1.1",
   "build": "202610040130",
   "copyright": "2026 One Off Endeavors",
+  "contentRightsDeclaration": "DOES_NOT_USE_THIRD_PARTY_CONTENT",
   "subtitle": "Classic Klondike, no ads",
   "privacyPolicyUrl": "https://oneoffendeavors.com/solitaire/privacy/",
   "supportUrl": "https://oneoffendeavors.com/solitaire/support/",
@@ -40,11 +41,25 @@
   ],
   "screenshots": {
     "IOS": {
-      "APP_IPHONE_67": ["iphone-1-board.png", "iphone-2-win.png", "iphone-3-rainfall.png", "iphone-4-settings.png"],
-      "APP_IPAD_PRO_3GEN_129": ["ipad-1-board.png", "ipad-2-win.png", "ipad-3-rainfall.png", "ipad-4-settings.png"]
+      "APP_IPHONE_67": [
+        "iphone-1-board.png",
+        "iphone-2-win.png",
+        "iphone-3-rainfall.png",
+        "iphone-4-settings.png"
+      ],
+      "APP_IPAD_PRO_3GEN_129": [
+        "ipad-1-board.png",
+        "ipad-2-win.png",
+        "ipad-3-rainfall.png",
+        "ipad-4-settings.png"
+      ]
     },
     "MAC_OS": {
-      "APP_DESKTOP": ["mac-1-board.png", "mac-2-win.png", "mac-3-rainfall.png"]
+      "APP_DESKTOP": [
+        "mac-1-board.png",
+        "mac-2-win.png",
+        "mac-3-rainfall.png"
+      ]
     }
   }
 }

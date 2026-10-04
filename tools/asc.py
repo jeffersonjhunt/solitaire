@@ -11,6 +11,10 @@
                                          platforms: version, build, text, URLs, category, age rating
                                          (all "none"), Game Center on, screenshots from
                                          build/store-shots; without --apply it only lists differences
+    tools/asc.py submit [--submit]       one App Review submission per platform with its version; the
+                                         first also carries every Game Center leaderboard and set
+                                         not yet live (Apple wants them with the first version).
+                                         Without --submit it only fills the drafts and lists them
     tools/asc.py gamecenter [--create]   Game Center and iCloud for the app: the bundle ID's
                                          capabilities, the four leaderboards and their set (spec
                                          "Scores"); --create adds whatever is missing, and only that
@@ -300,6 +304,13 @@ def listing(apply):
     app = app_id()
     changes = 0
 
+    # The app itself: whether it uses third-party content (the user's declaration: it doesn't).
+    rights = get(f"/v1/apps/{app}")["data"]["attributes"].get("contentRightsDeclaration")
+    changes += differs("content rights", rights, want["contentRightsDeclaration"], apply,
+                       lambda: patch(f"/v1/apps/{app}", "apps", app, {"contentRightsDeclaration":
+                                                                      want["contentRightsDeclaration"]},
+                                     what="content rights declaration"))
+
     # The app's own info (both platforms): subtitle, privacy URL, subcategory, age rating.
     info = [i for i in get(f"/v1/apps/{app}/appInfos")["data"]
             if i["attributes"].get("appStoreState") != "READY_FOR_SALE"][0]
@@ -412,6 +423,51 @@ def screenshots(loc_id, display, files, apply):
     return 1
 
 
+def submit(really):
+    app = app_id()
+    versions = get(f"/v1/apps/{app}/appStoreVersions?filter[appStoreState]=PREPARE_FOR_SUBMISSION,DEVELOPER_REJECTED,REJECTED")["data"]
+    if not versions:
+        sys.exit("no version waiting to be submitted")
+    gcd = get(f"/v1/apps/{app}/gameCenterDetail")["data"]["id"]
+    components = []
+    for kind, path, rel_name in (("gameCenterLeaderboardVersions", "gameCenterLeaderboardsV2", "gameCenterLeaderboardVersion"),
+                                 ("gameCenterLeaderboardSetVersions", "gameCenterLeaderboardSetsV2", "gameCenterLeaderboardSetVersion")):
+        d = get(f"/v1/gameCenterDetails/{gcd}/{path}?limit=50&include=versions")
+        names = {}
+        for item in d["data"]:
+            for v in item["relationships"]["versions"]["data"]:
+                names[v["id"]] = item["attributes"]["vendorIdentifier"]
+        for inc in d.get("included", []):
+            if inc["type"] == kind and inc["attributes"]["state"] == "PREPARE_FOR_SUBMISSION":
+                components.append((rel_name, kind, inc["id"], names.get(inc["id"], "?")))
+    drafts = {s["attributes"]["platform"]: s for s in
+              get(f"/v1/reviewSubmissions?filter[app]={app}&filter[state]=READY_FOR_REVIEW")["data"]}
+    for i, v in enumerate(sorted(versions, key=lambda v: v["attributes"]["platform"] != "IOS")):
+        platform = v["attributes"]["platform"]
+        sub = drafts.get(platform) or post("/v1/reviewSubmissions", {"data": {
+            "type": "reviewSubmissions", "attributes": {"platform": platform},
+            "relationships": {"app": rel("apps", app)}}}, f"{platform} draft submission")["data"]
+        have = get(f"/v1/reviewSubmissions/{sub['id']}/items?limit=50&include=appStoreVersion,gameCenterLeaderboardVersion,gameCenterLeaderboardSetVersion")["data"]
+        held = {r["data"]["id"] for item in have for r in item.get("relationships", {}).values()
+                if isinstance(r, dict) and isinstance(r.get("data"), dict)}
+        wanted = [("appStoreVersion", "appStoreVersions", v["id"], f"{platform} {v['attributes']['versionString']}")]
+        if i == 0:
+            wanted += components                                      # with the first platform's version only
+        for rel_name, kind, ident, label in wanted:
+            if ident not in held:
+                post("/v1/reviewSubmissionItems", {"data": {"type": "reviewSubmissionItems", "relationships": {
+                    "reviewSubmission": rel("reviewSubmissions", sub["id"]), rel_name: rel(kind, ident)}}},
+                    f"{platform} item: {label}")
+        print(f"{platform} submission {sub['id']}:")
+        for _, _, _, label in wanted:
+            print(f"  · {label}")
+        if really:
+            patch(f"/v1/reviewSubmissions/{sub['id']}", "reviewSubmissions", sub["id"], {"submitted": True},
+                  what=f"{platform}: SUBMITTED for review")
+    if not really:
+        print("drafts only — run with --submit to send them to App Review")
+
+
 def whats_new(build_number, path):
     """Sets the English "What to Test" text on every platform's upload of a build."""
     text = open(path).read().strip()
@@ -444,6 +500,8 @@ if __name__ == "__main__":
         bundle_id("--create" in sys.argv)
     elif cmd == "whats-new" and len(sys.argv) == 4:
         whats_new(sys.argv[2], sys.argv[3])
+    elif cmd == "submit":
+        submit("--submit" in sys.argv)
     elif cmd == "listing":
         listing("--apply" in sys.argv)
     elif cmd == "pricing":
