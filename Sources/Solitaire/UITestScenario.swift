@@ -27,8 +27,29 @@ enum UITestScenario {
     /// - `kingToAce`: column 1 holds a face-up run from K♠ down to A♠ (spades and hearts
     ///   alternating) and column 2 is empty, so the whole 13-card run can be dragged back and forth —
     ///   the drag Instruments measures (`make profile` launches this position).
+    /// - `midGame`: a real deal (seed 20261003) played automatically — anything to a foundation,
+    ///   tableau moves only when they turn a card over, else a draw — until 14 cards are home or
+    ///   play runs out; shown as 58 moves at 1:36 with no redeals — a game in progress for the App
+    ///   Store screenshots.
     static func state(named name: String) -> GameState? {
         switch name {
+        case "midGame":
+            var s = SolitaireEngine.newGame(drawCount: 1, seed: 20261003)
+            for _ in 0..<600 where s.foundations.joined().count < 14 {
+                if let move = showcaseMove(s) {
+                    SolitaireEngine.apply(move, to: &s)
+                } else if !s.stock.isEmpty || SolitaireEngine.canRedeal(s) {
+                    SolitaireEngine.drawFromStock(&s)
+                } else {
+                    break
+                }
+            }
+            // Shown as a first pass at a steady pace: the automatic player's redeals would cost the
+            // screenshot its score.
+            s.redeals = 0
+            s.moveCount = 58
+            s.elapsed = 96
+            return s
         case "almostWon":
             var s = SolitaireEngine.newGame(drawCount: 1, seed: 1)
             let suits: [Suit] = [.spades, .hearts, .diamonds, .clubs]
@@ -75,6 +96,26 @@ enum UITestScenario {
         default:
             return nil
         }
+    }
+}
+extension UITestScenario {
+    /// The next move for `midGame`: the waste's top card wherever it goes, any column's top card to
+    /// a foundation, or a column's face-up run that leaves a face-down card to turn over.
+    static func showcaseMove(_ s: GameState) -> Move? {
+        if let top = s.waste.indices.last, let to = SolitaireEngine.autoDestination(for: .waste, index: top, in: s) {
+            return Move(source: .waste, index: top, destination: to)
+        }
+        for (c, column) in s.tableau.enumerated() {
+            guard let first = column.firstIndex(where: \.isFaceUp) else { continue }
+            if let last = column.indices.last, let to = SolitaireEngine.autoDestination(for: .tableau(c), index: last, in: s),
+               case .foundation = to {
+                return Move(source: .tableau(c), index: last, destination: to)
+            }
+            if first > 0, let to = SolitaireEngine.autoDestination(for: .tableau(c), index: first, in: s) {
+                return Move(source: .tableau(c), index: first, destination: to)
+            }
+        }
+        return nil
     }
 }
 #endif
